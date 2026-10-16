@@ -1,0 +1,31 @@
+{
+  "jobs": [
+    {
+      "id": "02-agriculture",
+      "status": "succeeded",
+      "output": "output/planet-gameplay-designs/generation/batch-9eda1b4530/02-agriculture.png",
+      "outputs": [
+        "output/planet-gameplay-designs/generation/batch-9eda1b4530/02-agriculture.png"
+      ],
+      "returncode": 0
+    },
+    {
+      "id": "03-metallurgy",
+      "status": "succeeded",
+      "output": "output/planet-gameplay-designs/generation/batch-9eda1b4530/03-metallurgy.png",
+      "outputs": [
+        "output/planet-gameplay-designs/generation/batch-9eda1b4530/03-metallurgy.png"
+      ],
+      "returncode": 0
+    },
+    {
+      "id": "04-electric-manufacturing",
+      "status": "succeeded",
+      "output": "output/planet-gameplay-designs/generation/batch-9eda1b4530/04-electric-manufacturing.png",
+      "outputs": [
+        "output/planet-gameplay-designs/generation/batch-9eda1b4530/04-electric-manufacturing.png"
+      ],
+      "returncode": 0
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+[
+  {
+    "id": "02-top",
+    "returncode": 0
+  },
+  {
+    "id": "04-right",
+    "returncode": 1
+  },
+  {
+    "id": "03-left-side",
+    "returncode": 1
+  }
+]

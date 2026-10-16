@@ -1,0 +1,40 @@
+{
+  "jobs": [
+    {
+      "id": "01-gathering",
+      "status": "succeeded",
+      "output": "output/planet-soft-diorama-designs/generation/batch-981c68a9ac/01-gathering.png",
+      "outputs": [
+        "output/planet-soft-diorama-designs/generation/batch-981c68a9ac/01-gathering.png"
+      ],
+      "returncode": 0
+    },
+    {
+      "id": "02-agriculture",
+      "status": "succeeded",
+      "output": "output/planet-soft-diorama-designs/generation/batch-981c68a9ac/02-agriculture.png",
+      "outputs": [
+        "output/planet-soft-diorama-designs/generation/batch-981c68a9ac/02-agriculture.png"
+      ],
+      "returncode": 0
+    },
+    {
+      "id": "03-metallurgy",
+      "status": "succeeded",
+      "output": "output/planet-soft-diorama-designs/generation/batch-981c68a9ac/03-metallurgy.png",
+      "outputs": [
+        "output/planet-soft-diorama-designs/generation/batch-981c68a9ac/03-metallurgy.png"
+      ],
+      "returncode": 0
+    },
+    {
+      "id": "04-electric-manufacturing",
+      "status": "succeeded",
+      "output": "output/planet-soft-diorama-designs/generation/batch-981c68a9ac/04-electric-manufacturing.png",
+      "outputs": [
+        "output/planet-soft-diorama-designs/generation/batch-981c68a9ac/04-electric-manufacturing.png"
+      ],
+      "returncode": 0
+    }
+  ]
+}

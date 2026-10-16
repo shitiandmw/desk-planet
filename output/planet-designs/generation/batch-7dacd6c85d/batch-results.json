@@ -1,0 +1,40 @@
+{
+  "jobs": [
+    {
+      "id": "A-low-poly",
+      "status": "succeeded",
+      "output": "output/planet-designs/generation/batch-7dacd6c85d/A-low-poly.png",
+      "outputs": [
+        "output/planet-designs/generation/batch-7dacd6c85d/A-low-poly.png"
+      ],
+      "returncode": 0
+    },
+    {
+      "id": "B-clay-diorama",
+      "status": "succeeded",
+      "output": "output/planet-designs/generation/batch-7dacd6c85d/B-clay-diorama.png",
+      "outputs": [
+        "output/planet-designs/generation/batch-7dacd6c85d/B-clay-diorama.png"
+      ],
+      "returncode": 0
+    },
+    {
+      "id": "C-realistic-miniature",
+      "status": "succeeded",
+      "output": "output/planet-designs/generation/batch-7dacd6c85d/C-realistic-miniature.png",
+      "outputs": [
+        "output/planet-designs/generation/batch-7dacd6c85d/C-realistic-miniature.png"
+      ],
+      "returncode": 0
+    },
+    {
+      "id": "D-minimal-tech",
+      "status": "succeeded",
+      "output": "output/planet-designs/generation/batch-7dacd6c85d/D-minimal-tech.png",
+      "outputs": [
+        "output/planet-designs/generation/batch-7dacd6c85d/D-minimal-tech.png"
+      ],
+      "returncode": 0
+    }
+  ]
+}

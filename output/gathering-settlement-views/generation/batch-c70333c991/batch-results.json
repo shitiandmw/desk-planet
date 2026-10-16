@@ -1,0 +1,13 @@
+{
+  "jobs": [
+    {
+      "id": "04-right",
+      "status": "succeeded",
+      "output": "output/gathering-settlement-views/generation/batch-c70333c991/04-right.png",
+      "outputs": [
+        "output/gathering-settlement-views/generation/batch-c70333c991/04-right.png"
+      ],
+      "returncode": 0
+    }
+  ]
+}

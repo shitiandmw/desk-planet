@@ -1,0 +1,70 @@
+[
+  {
+    "id": "01-gathering",
+    "command": "edit",
+    "image": [
+      "/Users/shitian/Work/shitian/ai-games/.worktrees/at/184a170a/output/planet-gameplay-designs/generation/batch-80a052be24/01-gathering.png"
+    ],
+    "mask": "/Users/shitian/Work/shitian/ai-games/.worktrees/at/184a170a/output/planet-gameplay-designs/generation/water-masks/01-gathering-water-mask.png",
+    "model": "gpt-image-2.5-sunburst",
+    "size": "1536x1024",
+    "quality": "high",
+    "output_format": "png",
+    "n": 1,
+    "stream": false,
+    "timeout": 900,
+    "max_retries": 0,
+    "prompt": "Perform a precise LOCAL WATER MATERIAL revision of this civilization-management-game concept, using the provided mask. Preserve the entire planet geometry, camera, background, all buildings, facilities, people, roads, trees, farms, tanks, factory relationships and their exact positions. Keep the land terrain faceted low-poly.\n\nInside the existing calm blue bay, radically SIMPLIFY the water appearance into ONE smooth low-detail opaque turquoise surface following the planet. Use a softly graded clean blue-cyan base color with only TWO OR THREE very faint elongated soft turquoise highlight bands. Remove the mosaic of strongly contrasting triangular water facets, crystalline polygons, zigzag specular streaks and noisy little ripples. The water should look like a very simple clean game shader that can animate by slowly scrolling a soft texture. It is still obviously blue water, with gentle soft depth coloring and a stable simple shoreline. No glass crystals, no choppy waves, no storm, no splashes, no foam or physically simulated flow. Do not change the coastline or the world geometry. Keep the water surface calm and coherent.\n\nIf the selected small agricultural shore intake is visible, make it a compact static pump/intake box that connects to its fixed blue irrigation trough without an exposed falling-water spout. No waterfall. Preserve the simple blue channel and all nearby crops. Render no writing, no UI, no markers. Only refine the selected water material and selected intake area; all existing management facilities remain identical."
+  },
+  {
+    "id": "02-agriculture",
+    "command": "edit",
+    "image": [
+      "/Users/shitian/Work/shitian/ai-games/.worktrees/at/184a170a/output/planet-gameplay-designs/generation/batch-9eda1b4530/02-agriculture.png"
+    ],
+    "mask": "/Users/shitian/Work/shitian/ai-games/.worktrees/at/184a170a/output/planet-gameplay-designs/generation/water-masks/02-agriculture-water-mask.png",
+    "model": "gpt-image-2.5-sunburst",
+    "size": "1536x1024",
+    "quality": "high",
+    "output_format": "png",
+    "n": 1,
+    "stream": false,
+    "timeout": 900,
+    "max_retries": 0,
+    "prompt": "Perform a precise LOCAL WATER MATERIAL revision of this civilization-management-game concept, using the provided mask. Preserve the entire planet geometry, camera, background, all buildings, facilities, people, roads, trees, farms, tanks, factory relationships and their exact positions. Keep the land terrain faceted low-poly.\n\nInside the existing calm blue bay, radically SIMPLIFY the water appearance into ONE smooth low-detail opaque turquoise surface following the planet. Use a softly graded clean blue-cyan base color with only TWO OR THREE very faint elongated soft turquoise highlight bands. Remove the mosaic of strongly contrasting triangular water facets, crystalline polygons, zigzag specular streaks and noisy little ripples. The water should look like a very simple clean game shader that can animate by slowly scrolling a soft texture. It is still obviously blue water, with gentle soft depth coloring and a stable simple shoreline. No glass crystals, no choppy waves, no storm, no splashes, no foam or physically simulated flow. Do not change the coastline or the world geometry. Keep the water surface calm and coherent.\n\nIf the selected small agricultural shore intake is visible, make it a compact static pump/intake box that connects to its fixed blue irrigation trough without an exposed falling-water spout. No waterfall. Preserve the simple blue channel and all nearby crops. Render no writing, no UI, no markers. Only refine the selected water material and selected intake area; all existing management facilities remain identical."
+  },
+  {
+    "id": "03-metallurgy",
+    "command": "edit",
+    "image": [
+      "/Users/shitian/Work/shitian/ai-games/.worktrees/at/184a170a/output/planet-gameplay-designs/generation/batch-9eda1b4530/03-metallurgy.png"
+    ],
+    "mask": "/Users/shitian/Work/shitian/ai-games/.worktrees/at/184a170a/output/planet-gameplay-designs/generation/water-masks/03-metallurgy-water-mask.png",
+    "model": "gpt-image-2.5-sunburst",
+    "size": "1536x1024",
+    "quality": "high",
+    "output_format": "png",
+    "n": 1,
+    "stream": false,
+    "timeout": 900,
+    "max_retries": 0,
+    "prompt": "Perform a precise LOCAL WATER MATERIAL revision of this civilization-management-game concept, using the provided mask. Preserve the entire planet geometry, camera, background, all buildings, facilities, people, roads, trees, farms, tanks, factory relationships and their exact positions. Keep the land terrain faceted low-poly.\n\nInside the existing calm blue bay, radically SIMPLIFY the water appearance into ONE smooth low-detail opaque turquoise surface following the planet. Use a softly graded clean blue-cyan base color with only TWO OR THREE very faint elongated soft turquoise highlight bands. Remove the mosaic of strongly contrasting triangular water facets, crystalline polygons, zigzag specular streaks and noisy little ripples. The water should look like a very simple clean game shader that can animate by slowly scrolling a soft texture. It is still obviously blue water, with gentle soft depth coloring and a stable simple shoreline. No glass crystals, no choppy waves, no storm, no splashes, no foam or physically simulated flow. Do not change the coastline or the world geometry. Keep the water surface calm and coherent.\n\nIf the selected small agricultural shore intake is visible, make it a compact static pump/intake box that connects to its fixed blue irrigation trough without an exposed falling-water spout. No waterfall. Preserve the simple blue channel and all nearby crops. Render no writing, no UI, no markers. Only refine the selected water material and selected intake area; all existing management facilities remain identical."
+  },
+  {
+    "id": "04-electric-manufacturing",
+    "command": "edit",
+    "image": [
+      "/Users/shitian/Work/shitian/ai-games/.worktrees/at/184a170a/output/planet-gameplay-designs/generation/batch-9eda1b4530/04-electric-manufacturing.png"
+    ],
+    "mask": "/Users/shitian/Work/shitian/ai-games/.worktrees/at/184a170a/output/planet-gameplay-designs/generation/water-masks/04-electric-manufacturing-water-mask.png",
+    "model": "gpt-image-2.5-sunburst",
+    "size": "1536x1024",
+    "quality": "high",
+    "output_format": "png",
+    "n": 1,
+    "stream": false,
+    "timeout": 900,
+    "max_retries": 0,
+    "prompt": "Perform a precise LOCAL WATER MATERIAL revision of this civilization-management-game concept, using the provided mask. Preserve the entire planet geometry, camera, background, all buildings, facilities, people, roads, trees, farms, tanks, factory relationships and their exact positions. Keep the land terrain faceted low-poly.\n\nInside the existing calm blue bay, radically SIMPLIFY the water appearance into ONE smooth low-detail opaque turquoise surface following the planet. Use a softly graded clean blue-cyan base color with only TWO OR THREE very faint elongated soft turquoise highlight bands. Remove the mosaic of strongly contrasting triangular water facets, crystalline polygons, zigzag specular streaks and noisy little ripples. The water should look like a very simple clean game shader that can animate by slowly scrolling a soft texture. It is still obviously blue water, with gentle soft depth coloring and a stable simple shoreline. No glass crystals, no choppy waves, no storm, no splashes, no foam or physically simulated flow. Do not change the coastline or the world geometry. Keep the water surface calm and coherent.\n\nIf the selected small agricultural shore intake is visible, make it a compact static pump/intake box that connects to its fixed blue irrigation trough without an exposed falling-water spout. No waterfall. Preserve the simple blue channel and all nearby crops. Render no writing, no UI, no markers. Only refine the selected water material and selected intake area; all existing management facilities remain identical."
+  }
+]

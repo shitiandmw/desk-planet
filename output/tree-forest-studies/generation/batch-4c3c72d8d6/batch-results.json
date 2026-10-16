@@ -1,0 +1,13 @@
+{
+  "jobs": [
+    {
+      "id": "C-spreading-crown",
+      "status": "succeeded",
+      "output": "output/tree-forest-studies/generation/batch-4c3c72d8d6/C-spreading-crown.png",
+      "outputs": [
+        "output/tree-forest-studies/generation/batch-4c3c72d8d6/C-spreading-crown.png"
+      ],
+      "returncode": 0
+    }
+  ]
+}

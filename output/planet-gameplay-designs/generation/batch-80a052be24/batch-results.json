@@ -1,0 +1,13 @@
+{
+  "jobs": [
+    {
+      "id": "01-gathering",
+      "status": "succeeded",
+      "output": "output/planet-gameplay-designs/generation/batch-80a052be24/01-gathering.png",
+      "outputs": [
+        "output/planet-gameplay-designs/generation/batch-80a052be24/01-gathering.png"
+      ],
+      "returncode": 0
+    }
+  ]
+}

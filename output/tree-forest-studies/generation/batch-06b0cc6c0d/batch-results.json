@@ -1,0 +1,13 @@
+{
+  "jobs": [
+    {
+      "id": "settlement-preview",
+      "status": "succeeded",
+      "output": "output/tree-forest-studies/generation/batch-06b0cc6c0d/settlement-preview.png",
+      "outputs": [
+        "output/tree-forest-studies/generation/batch-06b0cc6c0d/settlement-preview.png"
+      ],
+      "returncode": 0
+    }
+  ]
+}
