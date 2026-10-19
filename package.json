@@ -1,0 +1,26 @@
+{
+  "name": "woodland-diorama",
+  "version": "0.2.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0 --port 5187 --strictPort",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview --host 0.0.0.0 --port 4173 --strictPort",
+    "test": "tsx --test src/*.test.ts",
+    "package:demo": "npm run build && node scripts/package-demo.mjs",
+    "balance": "tsx scripts/balance-playthrough.ts",
+    "qa:gameplay": "python3 scripts/qa-gameplay.py",
+    "stage:stable": "node scripts/stage-stable.mjs"
+  },
+  "dependencies": {
+    "three": "^0.180.0"
+  },
+  "devDependencies": {
+    "@types/three": "^0.180.0",
+    "typescript": "^5.9.3",
+    "vite": "^7.1.7",
+    "tsx": "^4.20.6",
+    "@types/node": "^22.18.0"
+  }
+}

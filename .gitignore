@@ -1,0 +1,12 @@
+node_modules/
+dist/
+.DS_Store
+output/woodland-demo/
+output/woodland-demo.zip
+output/planet-demo/
+output/planet-demo.zip
+output/planet-weather/
+
+output/planet-planning.zip
+output/planet-stable/
+output/releases/

@@ -1,0 +1,19 @@
+{
+  "viewport": [
+    1440,
+    1000
+  ],
+  "pixelRatio": 1,
+  "population": 12,
+  "buildings": 17,
+  "weather": "rain",
+  "economicPause": true,
+  "samples": 180,
+  "meanFrameMs": 16.665555555555493,
+  "fps": 60.00400026668467,
+  "drawCalls": 1559,
+  "triangles": 8722891,
+  "staticBodyMeshes": 3,
+  "articulatedLimbsVerified": true,
+  "scope": "short desktop browser sample; not physical mobile or max-load benchmark"
+}

@@ -1,0 +1,352 @@
+{
+  "version": 2,
+  "resources": {
+    "food": 159.28500000001702,
+    "wood": 315.79999999999876,
+    "stone": 102.09999999999982,
+    "ore": 6,
+    "metal": 7,
+    "tools": 2,
+    "parts": 0
+  },
+  "buildings": [
+    {
+      "id": "b1",
+      "type": "house",
+      "siteId": "home-a",
+      "yaw": 0.2,
+      "progress": 25,
+      "built": true,
+      "desiredWorkers": 0,
+      "priority": 1,
+      "paused": false,
+      "initial": true,
+      "produced": 0,
+      "limit": 0
+    },
+    {
+      "id": "b2",
+      "type": "house",
+      "siteId": "home-b",
+      "yaw": 0.12,
+      "progress": 25,
+      "built": true,
+      "desiredWorkers": 0,
+      "priority": 1,
+      "paused": false,
+      "initial": true,
+      "produced": 0,
+      "limit": 0
+    },
+    {
+      "id": "b3",
+      "type": "lumber",
+      "siteId": "woodcamp",
+      "yaw": -0.12,
+      "progress": 28,
+      "built": true,
+      "desiredWorkers": 2,
+      "priority": 1,
+      "paused": false,
+      "initial": true,
+      "produced": 614.8000000000003,
+      "limit": 0
+    },
+    {
+      "id": "b4",
+      "type": "warehouse",
+      "siteId": "store",
+      "yaw": 0,
+      "progress": 0,
+      "built": true,
+      "desiredWorkers": 0,
+      "priority": 1,
+      "paused": false,
+      "initial": true,
+      "produced": 0,
+      "limit": 0
+    },
+    {
+      "id": "b5",
+      "type": "forager",
+      "siteId": "berries",
+      "yaw": 0.35,
+      "progress": 20,
+      "built": true,
+      "desiredWorkers": 0,
+      "priority": 3,
+      "paused": false,
+      "initial": true,
+      "produced": 36,
+      "limit": 0
+    },
+    {
+      "id": "b6",
+      "type": "quarry",
+      "siteId": "stonepit",
+      "yaw": 0,
+      "progress": 28,
+      "built": true,
+      "desiredWorkers": 1,
+      "priority": 1,
+      "paused": false,
+      "initial": true,
+      "produced": 194.09999999999948,
+      "limit": 0
+    },
+    {
+      "id": "b7",
+      "type": "house",
+      "siteId": "meadow-1",
+      "yaw": 0,
+      "progress": 25,
+      "built": true,
+      "desiredWorkers": 0,
+      "priority": 1,
+      "paused": false,
+      "initial": false,
+      "produced": 0,
+      "limit": 0
+    },
+    {
+      "id": "b8",
+      "type": "forager",
+      "siteId": "meadow-3",
+      "yaw": 0,
+      "progress": 20,
+      "built": true,
+      "desiredWorkers": 0,
+      "priority": 3,
+      "paused": false,
+      "initial": false,
+      "produced": 14,
+      "limit": 0
+    },
+    {
+      "id": "b9",
+      "type": "workshop",
+      "siteId": "meadow-4",
+      "yaw": 0,
+      "progress": 40,
+      "built": true,
+      "desiredWorkers": 1,
+      "priority": 2,
+      "paused": false,
+      "initial": false,
+      "produced": 0,
+      "limit": 0
+    },
+    {
+      "id": "b10",
+      "type": "farm",
+      "siteId": "meadow-8",
+      "yaw": 0,
+      "progress": 30,
+      "built": true,
+      "desiredWorkers": 2,
+      "priority": 3,
+      "paused": false,
+      "initial": false,
+      "produced": 377,
+      "limit": 0
+    },
+    {
+      "id": "b11",
+      "type": "well",
+      "siteId": "meadow-7",
+      "yaw": 0,
+      "progress": 25,
+      "built": true,
+      "desiredWorkers": 0,
+      "priority": 1,
+      "paused": false,
+      "initial": false,
+      "produced": 0,
+      "limit": 0
+    },
+    {
+      "id": "b12",
+      "type": "granary",
+      "siteId": "meadow-11",
+      "yaw": 0,
+      "progress": 30,
+      "built": true,
+      "desiredWorkers": 0,
+      "priority": 1,
+      "paused": false,
+      "initial": false,
+      "produced": 0,
+      "limit": 0
+    },
+    {
+      "id": "b13",
+      "type": "house",
+      "siteId": "meadow-14",
+      "yaw": 0,
+      "progress": 25,
+      "built": true,
+      "desiredWorkers": 0,
+      "priority": 1,
+      "paused": false,
+      "initial": false,
+      "produced": 0,
+      "limit": 0
+    },
+    {
+      "id": "b14",
+      "type": "mine",
+      "siteId": "land-18",
+      "yaw": 0,
+      "progress": 35,
+      "built": true,
+      "desiredWorkers": 2,
+      "priority": 1,
+      "paused": false,
+      "initial": false,
+      "produced": 120,
+      "limit": 0
+    },
+    {
+      "id": "b15",
+      "type": "smelter",
+      "siteId": "land-15",
+      "yaw": 0,
+      "progress": 40,
+      "built": true,
+      "desiredWorkers": 2,
+      "priority": 1,
+      "paused": false,
+      "initial": false,
+      "produced": 57,
+      "limit": 0
+    },
+    {
+      "id": "b16",
+      "type": "smithy",
+      "siteId": "land-12",
+      "yaw": 0,
+      "progress": 35,
+      "built": true,
+      "desiredWorkers": 0,
+      "priority": 1,
+      "paused": false,
+      "initial": false,
+      "produced": 14,
+      "limit": 6
+    },
+    {
+      "id": "b17",
+      "type": "machine",
+      "siteId": "land-33",
+      "yaw": 0,
+      "progress": 55,
+      "built": true,
+      "desiredWorkers": 1,
+      "priority": 1,
+      "paused": false,
+      "initial": false,
+      "produced": 8,
+      "limit": 12
+    }
+  ],
+  "people": [
+    {
+      "id": 0,
+      "job": "b3",
+      "time": 901,
+      "deliveries": 93
+    },
+    {
+      "id": 1,
+      "job": "b6",
+      "time": 901,
+      "deliveries": 93
+    },
+    {
+      "id": 2,
+      "job": "b3",
+      "time": 1123,
+      "deliveries": 93
+    },
+    {
+      "id": 3,
+      "job": "b14",
+      "time": 132,
+      "deliveries": 93
+    },
+    {
+      "id": 4,
+      "job": "b15",
+      "time": 132,
+      "deliveries": 93
+    },
+    {
+      "id": 5,
+      "job": "b14",
+      "time": 592,
+      "deliveries": 63
+    },
+    {
+      "id": 6,
+      "job": "b10",
+      "time": 913,
+      "deliveries": 76
+    },
+    {
+      "id": 7,
+      "job": "b10",
+      "time": 913,
+      "deliveries": 76
+    },
+    {
+      "id": 8,
+      "job": "b15",
+      "time": 560,
+      "deliveries": 46
+    },
+    {
+      "id": 9,
+      "job": "b17",
+      "time": 128.25,
+      "deliveries": 22
+    },
+    {
+      "id": 10,
+      "job": null,
+      "time": 0,
+      "deliveries": 0
+    },
+    {
+      "id": 11,
+      "job": null,
+      "time": 0,
+      "deliveries": 0
+    }
+  ],
+  "elapsed": 1123,
+  "growthProgress": 0,
+  "growthEnabled": true,
+  "hungry": false,
+  "paused": true,
+  "speed": 1,
+  "buildersWanted": 1,
+  "technologies": [
+    "agriculture",
+    "tools",
+    "metallurgy",
+    "mechanics"
+  ],
+  "research": null,
+  "nextId": 18,
+  "totalProduced": {
+    "food": 427,
+    "wood": 614.8000000000003,
+    "stone": 194.09999999999948,
+    "ore": 120,
+    "metal": 57,
+    "tools": 14,
+    "parts": 8
+  },
+  "chapter": 4,
+  "era": "industrial"
+}

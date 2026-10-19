@@ -1,0 +1,179 @@
+{
+  "name": "微缩星球 · 文明初生",
+  "updated": "2026-10-19",
+  "representation": "rotatable globe with authoritative settlement simulation and illustrative local worker routes",
+  "world": {
+    "radius": 8.4,
+    "ocean_radius": 8.4,
+    "center": [
+      0,
+      0,
+      0
+    ],
+    "terrain": "global continuous 3D field",
+    "land_regions": 3,
+    "settlement_scale": 0.55,
+    "resource_trees": 5,
+    "background_trees": 32,
+    "cottages": 2,
+    "previous_radius": 6,
+    "surface_area_ratio": 1.96,
+    "min_elevation": -1.4
+  },
+  "rotation": {
+    "mode": "pointer trackball rotates planet quaternion",
+    "axis_limits": "none",
+    "auto_radians_per_second": 0.13,
+    "views": [
+      "planet",
+      "grove",
+      "coast",
+      "back"
+    ]
+  },
+  "features": [
+    "full sphere",
+    "continuous ocean",
+    "radial surface placement",
+    "free rotation",
+    "zoom",
+    "auto rotation",
+    "worker allocation",
+    "pause",
+    "lighting modes",
+    "wind",
+    "PNG capture",
+    "animated ocean swells",
+    "sky reflections",
+    "shore foam",
+    "four mesh cloud banks",
+    "local radial rain",
+    "automatic and manual weather",
+    "wet ground",
+    "building picking with globe occlusion",
+    "spherical site snapping and placement preview",
+    "housing, foraging, lumber, quarry, workshop, farming",
+    "shared food, wood and stone inventory",
+    "pooled workforce and priorities",
+    "construction queue and proportional refunds",
+    "food consumption and recovery",
+    "population growth",
+    "agriculture and tools research",
+    "pause and 1x/2x/4x speeds",
+    "validated local browser save",
+    "four progression chapters with one-time rewards",
+    "irrigation coverage on a sphere",
+    "food storage and granaries",
+    "atomic processing recipes",
+    "production stock targets",
+    "full-load supply and demand inspection",
+    "save import export and undo import"
+  ],
+  "work_cycle": {
+    "seconds": 12,
+    "outbound": 3,
+    "work": 4,
+    "return": 4,
+    "unload": 1,
+    "food_per_forager": 1,
+    "wood_per_lumber_worker": 2,
+    "stone_per_quarry_worker": 1,
+    "food_per_farmer": 2,
+    "machine_seconds": 16
+  },
+  "rendering": {
+    "engine": "Three.js WebGL2",
+    "shadow": "VSM 2048",
+    "ambient_occlusion": "SSAO 16 samples",
+    "maximum_pixel_ratio": 1.6,
+    "resident_optimization": "static torso/head/hat and cargo meshes merged; articulated limbs preserved"
+  },
+  "scope_limits": [
+    "through industrial beginning; information, AI and interstellar remain planned",
+    "no felling, resource depletion or regrowth",
+    "local illustrative walking routes, no global pathfinding",
+    "shared stock, no logistics throughput",
+    "no demolition, warfare or multiplayer",
+    "physical mobile devices not benchmarked",
+    "snapped sites rather than unrestricted free placement",
+    "water shader rather than fluid simulation",
+    "visual weather rather than meteorological simulation"
+  ],
+  "water": {
+    "material": "dielectric PBR",
+    "ior": 1.333,
+    "metalness": 0,
+    "environment": "embedded procedural sky",
+    "wave_coordinates": "3D globe coordinates",
+    "shore_amplitude_fade": true
+  },
+  "weather": {
+    "banks": 4,
+    "cloud_geometry": "continuous implicit surface meshes",
+    "transparent_cloud_sprites": 0,
+    "raindrops": 560,
+    "automatic_cycle_seconds": 90,
+    "modes": [
+      "auto",
+      "clear",
+      "cloudy",
+      "rain"
+    ],
+    "production_pause_independent": true
+  },
+  "gameplay": {
+    "initial_population": 6,
+    "initial_housing": 6,
+    "initial_stock": {
+      "wood": 55,
+      "stone": 28,
+      "food": 36
+    },
+    "initial_workers": {
+      "forager": 2,
+      "lumber": 2,
+      "quarry": 1,
+      "idle": 1
+    },
+    "maximum_population": 36,
+    "maximum_buildings": 80,
+    "construction_workers_maximum": 4,
+    "food_per_person_minute": 1.4,
+    "growth_seconds": 35,
+    "growth_food_threshold": 12,
+    "growth_food_cost": 6,
+    "research": [
+      "agriculture",
+      "tools",
+      "metallurgy",
+      "mechanics"
+    ],
+    "save_key": "mini-planet-game-v1",
+    "save_version": 2,
+    "offline_progress": false,
+    "weather_affects_economy": false,
+    "resources": [
+      "food",
+      "wood",
+      "stone",
+      "ore",
+      "metal",
+      "tools",
+      "parts"
+    ],
+    "legacy_save_versions": [
+      1
+    ],
+    "chapters": 4,
+    "food_storage_base": 80,
+    "granary_storage": 160,
+    "irrigation_range": 2.8,
+    "irrigation_yield_multiplier": 1.25,
+    "playable_eras": [
+      "gathering",
+      "farming",
+      "industrial beginning"
+    ]
+  },
+  "version": "0.2.0"
+}

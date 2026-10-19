@@ -1,0 +1,142 @@
+{
+  "version": 1,
+  "resources": {
+    "food": 34.600000000000136,
+    "wood": 35,
+    "stone": 20
+  },
+  "buildings": [
+    {
+      "id": "b1",
+      "type": "house",
+      "siteId": "home-a",
+      "yaw": 0.2,
+      "progress": 25,
+      "built": true,
+      "desiredWorkers": 0,
+      "priority": 1,
+      "paused": false,
+      "initial": true
+    },
+    {
+      "id": "b2",
+      "type": "house",
+      "siteId": "home-b",
+      "yaw": 0.12,
+      "progress": 25,
+      "built": true,
+      "desiredWorkers": 0,
+      "priority": 1,
+      "paused": false,
+      "initial": true
+    },
+    {
+      "id": "b3",
+      "type": "lumber",
+      "siteId": "woodcamp",
+      "yaw": -0.12,
+      "progress": 28,
+      "built": true,
+      "desiredWorkers": 2,
+      "priority": 1,
+      "paused": false,
+      "initial": true
+    },
+    {
+      "id": "b4",
+      "type": "warehouse",
+      "siteId": "store",
+      "yaw": 0,
+      "progress": 0,
+      "built": true,
+      "desiredWorkers": 0,
+      "priority": 1,
+      "paused": false,
+      "initial": true
+    },
+    {
+      "id": "b5",
+      "type": "forager",
+      "siteId": "berries",
+      "yaw": 0.35,
+      "progress": 20,
+      "built": true,
+      "desiredWorkers": 2,
+      "priority": 3,
+      "paused": false,
+      "initial": true
+    },
+    {
+      "id": "b6",
+      "type": "quarry",
+      "siteId": "stonepit",
+      "yaw": 0,
+      "progress": 28,
+      "built": true,
+      "desiredWorkers": 1,
+      "priority": 1,
+      "paused": false,
+      "initial": true
+    },
+    {
+      "id": "b7",
+      "type": "house",
+      "siteId": "meadow-1",
+      "yaw": 0,
+      "progress": 10,
+      "built": false,
+      "desiredWorkers": 0,
+      "priority": 1,
+      "paused": false,
+      "initial": false
+    }
+  ],
+  "people": [
+    {
+      "id": 0,
+      "job": "b5",
+      "time": 10,
+      "deliveries": 0
+    },
+    {
+      "id": 1,
+      "job": "b5",
+      "time": 10,
+      "deliveries": 0
+    },
+    {
+      "id": 2,
+      "job": "b3",
+      "time": 10,
+      "deliveries": 0
+    },
+    {
+      "id": 3,
+      "job": "b3",
+      "time": 10,
+      "deliveries": 0
+    },
+    {
+      "id": 4,
+      "job": "b6",
+      "time": 10,
+      "deliveries": 0
+    },
+    {
+      "id": 5,
+      "job": "construction",
+      "time": 10,
+      "deliveries": 0
+    }
+  ],
+  "elapsed": 10,
+  "growthProgress": 0,
+  "growthEnabled": true,
+  "hungry": false,
+  "paused": true,
+  "speed": 1,
+  "buildersWanted": 1,
+  "technologies": [],
+  "research": null,
+  "nextId": 8
+}

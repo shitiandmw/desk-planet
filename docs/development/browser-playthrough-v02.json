@@ -1,0 +1,570 @@
+{
+  "url": "http://localhost:5186",
+  "method": "actual UI clicks; read-only state inspection; 4x game speed",
+  "steps": [
+    {
+      "name": "start / resume",
+      "buildings": 6,
+      "chapter": 0,
+      "elapsed": 2.1664999999999996,
+      "era": "gathering",
+      "population": 6,
+      "rates": {
+        "food": 1.6000000000000014,
+        "metal": 0,
+        "ore": 0,
+        "parts": 0,
+        "stone": 5,
+        "tools": 0,
+        "wood": 20
+      },
+      "stock": {
+        "food": 35.69668999999986,
+        "metal": 0,
+        "ore": 0,
+        "parts": 0,
+        "stone": 28,
+        "tools": 0,
+        "wood": 55
+      }
+    },
+    {
+      "name": "built house",
+      "buildings": 7,
+      "chapter": 0,
+      "elapsed": 28.16530000000013,
+      "era": "gathering",
+      "population": 6,
+      "rates": {
+        "food": 1.6000000000000014,
+        "metal": 0,
+        "ore": 0,
+        "parts": 0,
+        "stone": 5,
+        "tools": 0,
+        "wood": 20
+      },
+      "stock": {
+        "food": 36.056858000000034,
+        "metal": 0,
+        "ore": 0,
+        "parts": 0,
+        "stone": 22,
+        "tools": 0,
+        "wood": 43
+      }
+    },
+    {
+      "name": "built forager",
+      "buildings": 8,
+      "chapter": 0,
+      "elapsed": 49.297699999999885,
+      "era": "gathering",
+      "population": 6,
+      "rates": {
+        "food": 1.6000000000000014,
+        "metal": 0,
+        "ore": 0,
+        "parts": 0,
+        "stone": 5,
+        "tools": 0,
+        "wood": 20
+      },
+      "stock": {
+        "food": 37.098322000000174,
+        "metal": 0,
+        "ore": 0,
+        "parts": 0,
+        "stone": 20,
+        "tools": 0,
+        "wood": 37
+      }
+    },
+    {
+      "name": "built workshop",
+      "buildings": 9,
+      "chapter": 0,
+      "elapsed": 139.494099999999,
+      "era": "gathering",
+      "population": 9,
+      "rates": {
+        "food": 2.4000000000000004,
+        "metal": 0,
+        "ore": 0,
+        "parts": 0,
+        "stone": 5,
+        "tools": 0,
+        "wood": 20
+      },
+      "stock": {
+        "food": 24.516956666666143,
+        "metal": 0,
+        "ore": 0,
+        "parts": 0,
+        "stone": 13,
+        "tools": 0,
+        "wood": 35
+      }
+    },
+    {
+      "name": "researched agriculture",
+      "buildings": 9,
+      "chapter": 0,
+      "elapsed": 186.8925000000021,
+      "era": "gathering",
+      "population": 9,
+      "rates": {
+        "food": 2.4000000000000004,
+        "metal": 0,
+        "ore": 0,
+        "parts": 0,
+        "stone": 5,
+        "tools": 0,
+        "wood": 20
+      },
+      "stock": {
+        "food": 26.56329266666654,
+        "metal": 0,
+        "ore": 0,
+        "parts": 0,
+        "stone": 11,
+        "tools": 0,
+        "wood": 36
+      }
+    },
+    {
+      "name": "claimed chapter 1",
+      "buildings": 9,
+      "chapter": 1,
+      "elapsed": 187.0925000000021,
+      "era": "gathering",
+      "population": 9,
+      "rates": {
+        "food": 2.4000000000000004,
+        "metal": 0,
+        "ore": 0,
+        "parts": 0,
+        "stone": 5,
+        "tools": 0,
+        "wood": 20
+      },
+      "stock": {
+        "food": 26.521292666666543,
+        "metal": 0,
+        "ore": 0,
+        "parts": 0,
+        "stone": 19,
+        "tools": 0,
+        "wood": 54
+      }
+    },
+    {
+      "name": "built farm",
+      "buildings": 10,
+      "chapter": 1,
+      "elapsed": 217.35810000000407,
+      "era": "gathering",
+      "population": 9,
+      "rates": {
+        "food": 2.4000000000000004,
+        "metal": 0,
+        "ore": 0,
+        "parts": 0,
+        "stone": 5,
+        "tools": 0,
+        "wood": 20
+      },
+      "stock": {
+        "food": 29.16551666666681,
+        "metal": 0,
+        "ore": 0,
+        "parts": 0,
+        "stone": 14,
+        "tools": 0,
+        "wood": 44
+      }
+    },
+    {
+      "name": "built well",
+      "buildings": 11,
+      "chapter": 1,
+      "elapsed": 255.95690000000704,
+      "era": "farming",
+      "population": 9,
+      "rates": {
+        "food": 12.4,
+        "metal": 0,
+        "ore": 0,
+        "parts": 0,
+        "stone": 10,
+        "tools": 0,
+        "wood": 30
+      },
+      "stock": {
+        "food": 36.05976866666718,
+        "metal": 0,
+        "ore": 0,
+        "parts": 0,
+        "stone": 7,
+        "tools": 0,
+        "wood": 44
+      }
+    },
+    {
+      "name": "built granary",
+      "buildings": 12,
+      "chapter": 1,
+      "elapsed": 310.2881000000191,
+      "era": "farming",
+      "population": 9,
+      "rates": {
+        "food": 12.4,
+        "metal": 0,
+        "ore": 0,
+        "parts": 0,
+        "stone": 10,
+        "tools": 0,
+        "wood": 30
+      },
+      "stock": {
+        "food": 44.65021666666786,
+        "metal": 0,
+        "ore": 0,
+        "parts": 0,
+        "stone": 5,
+        "tools": 0,
+        "wood": 42
+      }
+    },
+    {
+      "name": "claimed chapter 2",
+      "buildings": 12,
+      "chapter": 2,
+      "elapsed": 374.6189000000334,
+      "era": "farming",
+      "population": 9,
+      "rates": {
+        "food": 12.4,
+        "metal": 0,
+        "ore": 0,
+        "parts": 0,
+        "stone": 10,
+        "tools": 0,
+        "wood": 30
+      },
+      "stock": {
+        "food": 61.14074866666843,
+        "metal": 0,
+        "ore": 0,
+        "parts": 0,
+        "stone": 31,
+        "tools": 0,
+        "wood": 102
+      }
+    },
+    {
+      "name": "researched tools",
+      "buildings": 12,
+      "chapter": 2,
+      "elapsed": 420.2837000000436,
+      "era": "farming",
+      "population": 9,
+      "rates": {
+        "food": 12.4,
+        "metal": 0,
+        "ore": 0,
+        "parts": 0,
+        "stone": 13.5,
+        "tools": 0,
+        "wood": 40.5
+      },
+      "stock": {
+        "food": 66.55114066666849,
+        "metal": 0,
+        "ore": 0,
+        "parts": 0,
+        "stone": 28.35,
+        "tools": 0,
+        "wood": 105.4
+      }
+    },
+    {
+      "name": "researched metallurgy",
+      "buildings": 12,
+      "chapter": 2,
+      "elapsed": 481.01490000005714,
+      "era": "farming",
+      "population": 9,
+      "rates": {
+        "food": 12.4,
+        "metal": 0,
+        "ore": 0,
+        "parts": 0,
+        "stone": 13.5,
+        "tools": 0,
+        "wood": 40.5
+      },
+      "stock": {
+        "food": 78.7975886666679,
+        "metal": 0,
+        "ore": 0,
+        "parts": 0,
+        "stone": 29.850000000000016,
+        "tools": 0,
+        "wood": 121.90000000000003
+      }
+    },
+    {
+      "name": "built house",
+      "buildings": 13,
+      "chapter": 2,
+      "elapsed": 501.3477000000618,
+      "era": "farming",
+      "population": 9,
+      "rates": {
+        "food": 12.4,
+        "metal": 0,
+        "ore": 0,
+        "parts": 0,
+        "stone": 13.5,
+        "tools": 0,
+        "wood": 40.5
+      },
+      "stock": {
+        "food": 84.52770066666768,
+        "metal": 0,
+        "ore": 0,
+        "parts": 0,
+        "stone": 25.90000000000002,
+        "tools": 0,
+        "wood": 112.70000000000006
+      }
+    },
+    {
+      "name": "built mine",
+      "buildings": 14,
+      "chapter": 2,
+      "elapsed": 531.7469000000686,
+      "era": "farming",
+      "population": 9,
+      "rates": {
+        "food": 12.4,
+        "metal": 0,
+        "ore": 0,
+        "parts": 0,
+        "stone": 13.5,
+        "tools": 0,
+        "wood": 40.5
+      },
+      "stock": {
+        "food": 93.14386866666727,
+        "metal": 0,
+        "ore": 0,
+        "parts": 0,
+        "stone": 24.00000000000003,
+        "tools": 0,
+        "wood": 113.00000000000009
+      }
+    },
+    {
+      "name": "built smelter",
+      "buildings": 15,
+      "chapter": 2,
+      "elapsed": 564.8125000000762,
+      "era": "farming",
+      "population": 10,
+      "rates": {
+        "food": 11,
+        "metal": 0,
+        "ore": 10,
+        "parts": 0,
+        "stone": 13.5,
+        "tools": 0,
+        "wood": 40.5
+      },
+      "stock": {
+        "food": 89.52967000000054,
+        "metal": 0,
+        "ore": 4,
+        "parts": 0,
+        "stone": 12.750000000000028,
+        "tools": 0,
+        "wood": 108.60000000000012
+      }
+    },
+    {
+      "name": "claimed chapter 3",
+      "buildings": 15,
+      "chapter": 3,
+      "elapsed": 664.8085000000982,
+      "era": "farming",
+      "population": 12,
+      "rates": {
+        "food": 8.200000000000003,
+        "metal": 5,
+        "ore": 0,
+        "parts": 0,
+        "stone": 13.5,
+        "tools": 0,
+        "wood": 35.5
+      },
+      "stock": {
+        "food": 95.64453666666536,
+        "metal": 8,
+        "ore": 6,
+        "parts": 0,
+        "stone": 45.700000000000045,
+        "tools": 0,
+        "wood": 188.0999999999999
+      }
+    },
+    {
+      "name": "built smithy",
+      "buildings": 16,
+      "chapter": 3,
+      "elapsed": 698.406500000106,
+      "era": "farming",
+      "population": 12,
+      "rates": {
+        "food": 8.200000000000003,
+        "metal": 5,
+        "ore": 0,
+        "parts": 0,
+        "stone": 13.5,
+        "tools": 0,
+        "wood": 35.5
+      },
+      "stock": {
+        "food": 101.23709666666473,
+        "metal": 9,
+        "ore": 4,
+        "parts": 0,
+        "stone": 40.45000000000005,
+        "tools": 0,
+        "wood": 182.69999999999985
+      }
+    },
+    {
+      "name": "researched mechanics",
+      "buildings": 16,
+      "chapter": 3,
+      "elapsed": 851.667300000141,
+      "era": "farming",
+      "population": 12,
+      "rates": {
+        "food": 8.200000000000003,
+        "metal": 5,
+        "ore": 0,
+        "parts": 0,
+        "stone": 13.5,
+        "tools": 0,
+        "wood": 35.5
+      },
+      "stock": {
+        "food": 118.3240726666617,
+        "metal": 1,
+        "ore": 6,
+        "parts": 0,
+        "stone": 74.20000000000003,
+        "tools": 6,
+        "wood": 238.59999999999943
+      }
+    },
+    {
+      "name": "built machine",
+      "buildings": 17,
+      "chapter": 3,
+      "elapsed": 949.8637000001636,
+      "era": "farming",
+      "population": 12,
+      "rates": {
+        "food": 8.200000000000003,
+        "metal": 5,
+        "ore": 0,
+        "parts": 0,
+        "stone": 6.75,
+        "tools": 5,
+        "wood": 12
+      },
+      "stock": {
+        "food": 135.8290806666583,
+        "metal": 5,
+        "ore": 4,
+        "parts": 0,
+        "stone": 65,
+        "tools": 3,
+        "wood": 228.4999999999993
+      }
+    },
+    {
+      "name": "claimed chapter 4",
+      "buildings": 17,
+      "chapter": 4,
+      "elapsed": 1078.9249000001928,
+      "era": "industrial",
+      "population": 12,
+      "rates": {
+        "food": 8.200000000000003,
+        "metal": 2.5,
+        "ore": 0,
+        "parts": 3.75,
+        "stone": 8.100000000000001,
+        "tools": 0,
+        "wood": 18.65000000000001
+      },
+      "stock": {
+        "food": 149.69194466665104,
+        "metal": 9,
+        "ore": 6,
+        "parts": 0,
+        "stone": 79.84999999999994,
+        "tools": 3,
+        "wood": 257.199999999999
+      }
+    },
+    {
+      "name": "final reload matched exactly",
+      "buildings": 17,
+      "chapter": 4,
+      "elapsed": 1078.9249000001928,
+      "era": "industrial",
+      "population": 12,
+      "rates": {
+        "food": 8.200000000000003,
+        "metal": 2.5,
+        "ore": 0,
+        "parts": 3.75,
+        "stone": 8.100000000000001,
+        "tools": 0,
+        "wood": 18.65000000000001
+      },
+      "stock": {
+        "food": 149.69194466665104,
+        "metal": 9,
+        "ore": 6,
+        "parts": 0,
+        "stone": 79.84999999999994,
+        "tools": 3,
+        "wood": 257.199999999999
+      }
+    }
+  ],
+  "complete": true,
+  "errors": {
+    "errors": [],
+    "lifecycle": {
+      "effectiveLaunch": {
+        "browserLaunched": true,
+        "engine": "chrome",
+        "launchHash": 11677035664275010974
+      },
+      "launched": false,
+      "relaunchedBrowser": false,
+      "restartedBackground": false,
+      "restoreStatus": "not_configured",
+      "reused": true,
+      "saveStatus": "not_attempted"
+    }
+  },
+  "notes": "完整点击流程在 UI 收支显示细化前完成；之后另做满负荷缺口、工业树冠间距、存档导入撤销、窄屏和离线检查。rates 为当时的瞬时可运行产能估算。"
+}

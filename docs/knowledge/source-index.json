@@ -1,0 +1,122 @@
+{
+  "games_covered": 12,
+  "sources": [
+    {
+      "id": "S01",
+      "title": "Factorio 官网",
+      "url": "https://www.factorio.com/",
+      "publisher": "Wube",
+      "accessed": "2026-10-19",
+      "evidence_type": "developer_primary_source",
+      "verified_summary": "采矿、研究、基础设施、自动化生产共同构成工厂发展"
+    },
+    {
+      "id": "S02",
+      "title": "Friday Facts #397 — Factoriopedia",
+      "url": "https://www.factorio.com/blog/post/fff-397",
+      "publisher": "Wube，2024-02-09",
+      "accessed": "2026-10-19",
+      "evidence_type": "developer_primary_source",
+      "verified_summary": "配方原料、下游用途、解锁科技集中展示；从对象直接打开相关条目"
+    },
+    {
+      "id": "S03",
+      "title": "Timberborn",
+      "url": "https://store.steampowered.com/app/1062090/Timberborn/",
+      "publisher": "Mechanistry",
+      "accessed": "2026-10-19",
+      "evidence_type": "developer_primary_source",
+      "verified_summary": "周期性干旱与污染水、粮食储备、灌溉、水工、垂直建筑、机械与机器人"
+    },
+    {
+      "id": "S04",
+      "title": "Satisfactory",
+      "url": "https://store.steampowered.com/app/526870/Satisfactory/",
+      "publisher": "Coffee Stain",
+      "accessed": "2026-10-19",
+      "evidence_type": "developer_primary_source",
+      "verified_summary": "工厂与传送带、远端卡车和铁路运输、管道流体、自动化减少手动劳动"
+    },
+    {
+      "id": "S05",
+      "title": "Dyson Sphere Program",
+      "url": "https://store.steampowered.com/app/1366540/Dyson_Sphere_Program/",
+      "publisher": "Youthcat",
+      "accessed": "2026-10-19",
+      "evidence_type": "developer_primary_source",
+      "verified_summary": "球面吸附、逐步复杂化的加工链、蓝图、差异化星球、跨星球运输和巨构目标"
+    },
+    {
+      "id": "S06",
+      "title": "Anno 1800",
+      "url": "https://store.steampowered.com/app/916440/Anno_1800/",
+      "publisher": "Ubisoft",
+      "accessed": "2026-10-19",
+      "evidence_type": "developer_primary_source",
+      "verified_summary": "人口需求、生产链、电力蒸汽、工人幸福与工厂产出之间的取舍"
+    },
+    {
+      "id": "S07",
+      "title": "Foundation",
+      "url": "https://store.steampowered.com/app/690830/Foundation/",
+      "publisher": "Polymorph",
+      "accessed": "2026-10-19",
+      "evidence_type": "developer_primary_source",
+      "verified_summary": "无网格与模块化建造、区域绘制、岗位、生产链、可选择的发展目标"
+    },
+    {
+      "id": "S08",
+      "title": "Against the Storm",
+      "url": "https://store.steampowered.com/app/1336490/Against_the_Storm/",
+      "publisher": "Eremite",
+      "accessed": "2026-10-19",
+      "evidence_type": "developer_primary_source",
+      "verified_summary": "居民差异、暴风压力、声望与目标、蓝图组合、多聚落及跨局成长"
+    },
+    {
+      "id": "S09",
+      "title": "ISLANDERS",
+      "url": "https://store.steampowered.com/app/1046030/ISLANDERS/",
+      "publisher": "GrizzlyGames",
+      "accessed": "2026-10-19",
+      "evidence_type": "developer_primary_source",
+      "verified_summary": "建筑得分取决于周围对象，得分补充建筑，有限建筑推动布局选择"
+    },
+    {
+      "id": "S10",
+      "title": "The Universim",
+      "url": "https://store.steampowered.com/app/352720/The_Universim/",
+      "publisher": "Crytivo",
+      "accessed": "2026-10-19",
+      "evidence_type": "developer_primary_source",
+      "verified_summary": "文明从石器走向太空，居民需求、研究、生态与不同星球共同推进"
+    },
+    {
+      "id": "S11",
+      "title": "Before We Leave 官网",
+      "url": "https://www.balancingmonkeygames.com/before-we-leave",
+      "publisher": "Balancing Monkey",
+      "accessed": "2026-10-19",
+      "evidence_type": "developer_primary_source",
+      "verified_summary": "提供住房、发现古代技术，从初始农业扩展到其他大陆和星球"
+    },
+    {
+      "id": "S12",
+      "title": "Dorfromantik",
+      "url": "https://store.steampowered.com/app/1455840/Dorfromantik/",
+      "publisher": "Toukana",
+      "accessed": "2026-10-19",
+      "evidence_type": "developer_primary_source",
+      "verified_summary": "板块旋转与组合、局部任务补充板块、长期任务解锁内容；正文明确不提供资源管理"
+    },
+    {
+      "id": "S13",
+      "title": "Oxygen Not Included 官网",
+      "url": "https://www.klei.com/games/oxygen-not-included",
+      "publisher": "Klei",
+      "accessed": "2026-10-19",
+      "evidence_type": "developer_primary_source",
+      "verified_summary": "氧气、温度和食物是生存约束；Spaced Out 的跨基地资源运输与多世界管理"
+    }
+  ]
+}

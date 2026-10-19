@@ -1,0 +1,94 @@
+[
+  {
+    "strategy": "irrigate",
+    "milestones": [
+      {
+        "name": "settlement",
+        "seconds": 180,
+        "population": 9
+      },
+      {
+        "name": "farming",
+        "seconds": 378,
+        "population": 9
+      },
+      {
+        "name": "metallurgy",
+        "seconds": 659,
+        "population": 12
+      },
+      {
+        "name": "industrial beginning",
+        "seconds": 1123,
+        "population": 12
+      }
+    ],
+    "elapsed": 1123,
+    "population": 12,
+    "buildings": 17,
+    "stock": {
+      "food": 159.28500000001702,
+      "wood": 315.79999999999876,
+      "stone": 102.09999999999982,
+      "ore": 6,
+      "metal": 7,
+      "tools": 2,
+      "parts": 0
+    },
+    "rates": {
+      "food": 8.200000000000003,
+      "wood": 18.650000000000006,
+      "stone": 8.100000000000001,
+      "ore": 0,
+      "metal": 2.5,
+      "tools": 0,
+      "parts": 3.75
+    }
+  },
+  {
+    "strategy": "expand",
+    "milestones": [
+      {
+        "name": "settlement",
+        "seconds": 180,
+        "population": 9
+      },
+      {
+        "name": "farming",
+        "seconds": 342,
+        "population": 9
+      },
+      {
+        "name": "metallurgy",
+        "seconds": 623,
+        "population": 12
+      },
+      {
+        "name": "industrial beginning",
+        "seconds": 1087,
+        "population": 12
+      }
+    ],
+    "elapsed": 1087,
+    "population": 12,
+    "buildings": 17,
+    "stock": {
+      "food": 219.8450000000174,
+      "wood": 289.09999999999894,
+      "stone": 97.39999999999985,
+      "ore": 6,
+      "metal": 7,
+      "tools": 2,
+      "parts": 0
+    },
+    "rates": {
+      "food": 13.200000000000003,
+      "wood": 18.650000000000006,
+      "stone": 8.100000000000001,
+      "ore": 0,
+      "metal": 2.5,
+      "tools": 0,
+      "parts": 3.75
+    }
+  }
+]
