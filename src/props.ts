@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { beam, branchGeometry, canvasTexture, mesh, mergeMeshes, rng, standard, vec, woodMaterial } from './craft';
 
 const timber = woodMaterial('#ad8960'), darkwood = woodMaterial('#796044'), bark = woodMaterial('#807052', true);
@@ -74,25 +75,102 @@ export function logPile() {
 export interface Person { root: THREE.Group; body: THREE.Group; leftLeg: THREE.Group; rightLeg: THREE.Group; leftArm: THREE.Group; rightArm: THREE.Group; carried: THREE.Group; axe: THREE.Group }
 /** People share one vertex-coloured material, and each body part merges into a single mesh. */
 const figure = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: .9 });
-function part(parent: THREE.Object3D, geo: THREE.BufferGeometry, color: THREE.ColorRepresentation, at: THREE.Vector3) {
+function part(parent: THREE.Object3D, geo: THREE.BufferGeometry, color: THREE.ColorRepresentation, at?: THREE.Vector3) {
   const c = new THREE.Color(color), data = new Float32Array(geo.attributes.position.count * 3);
   for (let i = 0; i < data.length; i += 3) c.toArray(data, i);
   geo.setAttribute('color', new THREE.Float32BufferAttribute(data, 3)); return mesh(geo, figure, parent, at);
 }
+/** Profiles run bottom to top for outward faces; `[radius, height]` pairs. */
+const lathe = (profile: number[][], segments = 14, start = 0, length = Math.PI * 2) => new THREE.LatheGeometry(profile.map(([x, y]) => new THREE.Vector2(x, y)), segments, start, length);
+const ring = (radius: number, tube: number, segments = 14) => new THREE.TorusGeometry(radius, tube, 4, segments).rotateX(Math.PI / 2);
+
+// Wardrobe in the village palette. Each citizen id fixes a look; the six founders each get a different role.
+const SKIN = ['#f0d0ae', '#e2b38b', '#c78d63', '#9a6646'], HAIR = ['#2f241d', '#5a3b26', '#8b5a32', '#caa05f', '#1f1c1b', '#a9a39a'];
+const TOPS = ['#c27b4a', '#7f9c6b', '#5d84a3', '#d2a650', '#a3595a', '#e3d8bf', '#7c6e9c', '#4e8a80'];
+const TROUSERS = ['#4f5a68', '#6d5843', '#5a6247', '#3f4650', '#8a7558'], WRAPS = ['#c4553d', '#d9a441', '#4f7fa6', '#7aa36b', '#b46a8a'];
+const VESTS = ['#5b4636', '#3f4a5a', '#6b6f4b', '#8a5a3c'], CAPS = ['#5a5550', '#6b5a48', '#4a5664', '#7d6b52'], SHOES = ['#4a3a2c', '#3a3634', '#6b4a33'], LINEN = '#efe6d2';
+
 export function makePerson(id: number): Person {
-  const root = new THREE.Group(), body = new THREE.Group(), staticBody = new THREE.Group(); root.add(body); body.add(staticBody);
-  const shirt = ['#b28553', '#7b8b86', '#9a775f'][id % 3], trousers = '#55635f', skin = '#d7b187', boots = '#514b3a', hat = '#baa174';
-  part(staticBody, new THREE.CapsuleGeometry(.105, .15, 3, 8), shirt, vec(0, .37, 0));
-  part(staticBody, new THREE.SphereGeometry(.095, 12, 8), skin, vec(0, .62, 0));
-  part(staticBody, new THREE.SphereGeometry(.025, 6, 4), skin, vec(0, .61, .085));
-  part(staticBody, new THREE.CylinderGeometry(.089, .1, .06, 12), hat, vec(0, .7, 0));
-  part(staticBody, new THREE.CylinderGeometry(.15, .15, .018, 16), hat, vec(0, .665, 0));
-  mergeMeshes(staticBody);
+  const root = new THREE.Group(), body = new THREE.Group(), torso = new THREE.Group(); root.add(body); body.add(torso);
+  const random = rng(id * 7919 + 17), pick = <T>(list: readonly T[]) => list[Math.floor(random() * list.length)];
+  // Roles: 0 farmer in a straw hat, 1 headscarf and apron, 2 carter in cap and waistcoat, 3 bun, 4 smith in a beanie, 5 bare-headed.
+  const role = id < 6 ? id : Math.floor(random() * 6), dress = role === 1 || (role === 3 && random() < .5);
+  const skin = pick(SKIN), hair = pick(HAIR), top = pick(TOPS), legs = dress ? '#4b423c' : pick(TROUSERS), shoes = pick(SHOES), wrap = pick(WRAPS);
+  const rolled = role === 0 || role === 4 || random() < .3, whiskers = !dress && role !== 5 && random() < .6, boots = role === 0 || role === 4 || random() < .3;
+
+  // Body: hips, or a skirt flared so a striding leg stays inside the hem; a tapered chest, belt, collar and neck.
+  if (dress) part(torso, lathe([[.085, .3], [.1, .2], [.13, .15], [.145, .145], [.14, .16], [.118, .23], [.102, .29], [.093, .33]], 16).scale(1, 1, .9), top);
+  else part(torso, new THREE.SphereGeometry(.098, 12, 6).scale(1, .6, .8), legs, vec(0, .27, 0));
+  part(torso, lathe([[.088, .29], [.095, .34], [.104, .4], [.106, .44], [.098, .485], [.078, .515], [.045, .535], [.001, .54]], 12).scale(1, 1, .8), top);
+  part(torso, new THREE.CylinderGeometry(.097, .097, .026, 16, 1, true).scale(1, 1, .8), dress ? wrap : '#5a4130', vec(0, .305, 0));
+  if (!dress) part(torso, new THREE.BoxGeometry(.03, .024, .01), '#c9a24e', vec(0, .305, .079));
+  part(torso, new THREE.CylinderGeometry(.033, .037, .07, 10), skin, vec(0, .55, 0));
+  part(torso, ring(.043, .011, 12), role === 3 ? wrap : LINEN, vec(0, .528, 0));
+  // Over-clothes: aprons for the farm wife and the smith, waistcoats for the carter and some of the young.
+  if (role === 1 || role === 4) part(torso, lathe([[.155, .16], [.13, .23], [.11, .29], [.104, .34], [.106, .41]], 10, -1, 2).scale(1, 1, .86), role === 4 ? '#7d5d40' : LINEN);
+  if (role === 2 || (role === 5 && random() < .5)) part(torso, lathe([[.099, .3], [.108, .4], [.11, .44], [.103, .485], [.083, .512]], 14, .5, Math.PI * 2 - 1).scale(1, 1, .8), pick(VESTS));
+
+  // Head: painted-toy face with ears, oval eyes, brows, blush and a small smile.
+  const blush = new THREE.Color(skin).lerp(new THREE.Color('#e0705f'), .4);
+  part(torso, new THREE.SphereGeometry(.1, 14, 10), skin, vec(0, .645, 0));
+  part(torso, new THREE.SphereGeometry(.019, 8, 6), skin, vec(0, .625, .097));
+  part(torso, new THREE.TorusGeometry(.012, .0026, 4, 8, Math.PI).rotateZ(Math.PI).rotateX(.4), '#7a3b30', vec(0, .608, .093));
+  for (const s of [-1, 1]) {
+    part(torso, new THREE.SphereGeometry(.022, 6, 4).scale(.55, 1, .8), skin, vec(s * .099, .638, -.004));
+    part(torso, new THREE.SphereGeometry(.012, 6, 4).scale(1, 1.3, .55).rotateY(s * .36), '#2a221d', vec(s * .035, .648, .091));
+    part(torso, new THREE.BoxGeometry(.032, .008, .01).rotateZ(-s * .12).rotateY(s * .36), hair, vec(s * .037, .675, .087));
+    part(torso, new THREE.SphereGeometry(.019, 6, 4).scale(1, .7, .35).rotateY(s * .6), blush, vec(s * .056, .618, .079));
+  }
+  if (whiskers) part(torso, new THREE.CapsuleGeometry(.009, .03, 2, 6).rotateZ(Math.PI / 2), hair, vec(0, .613, .096));
+  if (whiskers && random() < .5) part(torso, new THREE.SphereGeometry(.104, 14, 5, Math.PI / 2 - 1.2, 2.4, 1.98, .8), hair, vec(0, .642, .004));
+
+  // Hair is a sphere cap tilted back, so it starts at the forehead and reaches the nape; hats sit on top.
+  const hat = ['straw', 'scarf', 'cap', 'none', 'beanie', 'none'][role], style = role === 3 ? 'bun' : role === 5 ? pick(['ponytail', 'bob']) : 'short';
+  if (hat !== 'scarf') part(torso, new THREE.SphereGeometry(.108, 14, 7, 0, Math.PI * 2, 0, style === 'bun' ? 1.85 : 1.72).rotateX(style === 'bun' ? -.75 : -.62), hair, vec(0, .65, -.004));
+  if (style === 'bob') part(torso, new THREE.SphereGeometry(.112, 16, 6, Math.PI / 2 + .95, Math.PI * 2 - 1.9, .85, 1.35), hair, vec(0, .645, -.006));
+  if (style === 'bun') part(torso, new THREE.SphereGeometry(.05, 10, 8), hair, vec(0, .7, -.105));
+  if (style === 'ponytail') { part(torso, new THREE.SphereGeometry(.024, 8, 6), wrap, vec(0, .668, -.104)); part(torso, new THREE.CapsuleGeometry(.03, .1, 3, 8).rotateX(.3), hair, vec(0, .59, -.122)); }
+  const cover = new THREE.Group(); torso.add(cover);
+  if (hat === 'straw') {
+    cover.position.set(0, .705, 0); cover.rotation.x = -.08;
+    part(cover, lathe([[.094, 0], [.092, .03], [.086, .055], [.06, .07], [.001, .072]], 16), '#d9bc7c');
+    part(cover, new THREE.CylinderGeometry(.165, .17, .012, 20), '#d9bc7c', vec(0, .004, 0));
+    part(cover, new THREE.CylinderGeometry(.0945, .0935, .02, 16, 1, true), pick(['#8a4b3a', '#4e5f73', '#5d6b45']), vec(0, .02, 0));
+  } else if (hat === 'cap') {
+    const color = pick(CAPS); cover.position.set(0, .7, -.006); cover.rotation.x = .12;
+    part(cover, new THREE.SphereGeometry(.113, 16, 6, 0, Math.PI * 2, 0, Math.PI / 2).scale(1, .62, 1.06), color);
+    part(cover, new THREE.CylinderGeometry(.075, .075, .01, 14, 1, false, -Math.PI / 2, Math.PI).scale(1, 1, .8).rotateX(.15), color, vec(0, .003, .1));
+  } else if (hat === 'scarf') {
+    part(cover, new THREE.SphereGeometry(.113, 14, 8, 0, Math.PI * 2, 0, 1.9).rotateX(-.75), wrap, vec(0, .648, -.004));
+    part(cover, new THREE.SphereGeometry(.026, 6, 5), wrap, vec(0, .6, -.113));
+    for (const s of [-1, 1]) part(cover, new THREE.SphereGeometry(.026, 6, 4).scale(.7, 1.5, .5).rotateZ(s * .5), wrap, vec(s * .02, .566, -.112));
+  } else if (hat === 'beanie') {
+    part(cover, new THREE.SphereGeometry(.112, 14, 6, 0, Math.PI * 2, 0, 1.45).scale(1, 1.05, 1), wrap, vec(0, .688, -.003));
+    part(cover, ring(.106, .018, 16), wrap, vec(0, .7, -.003));
+    part(cover, new THREE.SphereGeometry(.032, 8, 6), LINEN, vec(0, .82, -.008));
+  }
+  mergeMeshes(torso);
+
   const leftLeg = new THREE.Group(), rightLeg = new THREE.Group();
-  [leftLeg, rightLeg].forEach((limb, i) => { limb.position.set(i ? .062 : -.062, .28, 0); body.add(limb); part(limb, new THREE.CapsuleGeometry(.041, .13, 3, 6), trousers, vec(0, -.09, 0)); part(limb, new THREE.BoxGeometry(.087, .065, .14), boots, vec(0, -.235, .025)); mergeMeshes(limb); });
+  [leftLeg, rightLeg].forEach((limb, i) => {
+    limb.position.set(i ? .062 : -.062, .28, 0); body.add(limb);
+    part(limb, new THREE.CapsuleGeometry(.044, .14, 2, 8), legs, vec(0, -.11, 0));
+    if (boots) part(limb, new THREE.CylinderGeometry(.048, .05, .08, 10), shoes, vec(0, -.2, 0));
+    part(limb, new RoundedBoxGeometry(.088, .065, .15, 1, .026), shoes, vec(0, -.245, .025));
+    mergeMeshes(limb);
+  });
+  // Rolled sleeves show the forearm; full ones end in a linen cuff.
   const leftArm = new THREE.Group(), rightArm = new THREE.Group();
-  [leftArm, rightArm].forEach((limb, i) => { limb.position.set(i ? .13 : -.13, .47, 0); body.add(limb); part(limb, new THREE.CapsuleGeometry(.037, .12, 3, 6), shirt, vec(0, -.075, 0)); part(limb, new THREE.SphereGeometry(.04, 8, 6), skin, vec(0, -.172, 0)); mergeMeshes(limb); });
-  const carried = new THREE.Group(); log(carried, vec(0, 0, 0), .68, .075); mergeMeshes(carried); carried.position.set(.13, .55, .06); body.add(carried);
-  const axe = new THREE.Group(); beam(axe, vec(0, -.15, 0), vec(0, -.15, .36), .025, .025, timber); mesh(new THREE.BoxGeometry(.14, .08, .04), iron, axe, vec(0, -.15, .34)); rightArm.add(axe);
+  [leftArm, rightArm].forEach((limb, i) => {
+    limb.position.set(i ? .13 : -.13, .47, 0); body.add(limb);
+    part(limb, new THREE.CapsuleGeometry(.039, rolled ? .06 : .1, 2, 8), top, vec(0, rolled ? -.05 : -.075, 0));
+    if (rolled) part(limb, new THREE.CapsuleGeometry(.03, .06, 2, 8), skin, vec(0, -.13, 0));
+    part(limb, ring(.036, rolled ? .0065 : .008, 8), rolled ? top : LINEN, vec(0, rolled ? -.098 : -.15, 0));
+    part(limb, new THREE.SphereGeometry(.035, 8, 6).scale(.9, 1.1, 1), skin, vec(0, -.185, .004));
+    mergeMeshes(limb);
+  });
+  const carried = new THREE.Group(); log(carried, vec(0, 0, 0), .68, .075); mergeMeshes(carried); carried.position.set(.16, .56, .04); body.add(carried);
+  // The blade sits on the side the swing moves towards, so it leads each chop.
+  const axe = new THREE.Group(); beam(axe, vec(0, -.185, -.03), vec(0, -.185, .36), .022, .022, timber); mesh(new THREE.BoxGeometry(.03, .1, .065), iron, axe, vec(0, -.22, .33)); rightArm.add(axe);
   return { root, body, leftLeg, rightLeg, leftArm, rightArm, carried, axe };
 }

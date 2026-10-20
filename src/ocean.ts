@@ -43,7 +43,8 @@ export class Ocean {
     uDeepWater: { value: new THREE.Color('#14609a') },
     uMidWater: { value: new THREE.Color('#1f97bf') },
     uShallowWater: { value: new THREE.Color('#41c3c2') },
-    uSeabed: { value: new THREE.Color('#e3d7aa') },
+    // Darker than the beach sand: the water is also lit by the sky environment, which the ground is not.
+    uSeabed: { value: new THREE.Color('#bfb27e') },
     uFoam: { value: new THREE.Color('#f4f8f2') },
     uPlanetField: { value: null as THREE.Texture | null },
   };
@@ -107,19 +108,19 @@ export class Ocean {
         water = mix(water, water * vec3(.82, .92, .96), ripples * smoothstep(.45, .8, oceanField.a) * smoothstep(.04, .2, oceanDepth) * (.06 + uRain * .08));
         if (oceanDepth < .5) {
           // Beer-Lambert style clarity: the sandy bed shows through the shallows and caustics play across it.
-          float clarity = exp(-oceanDepth * 24.), light = caustics(vOceanPoint);
-          water = mix(water, uSeabed * (.9 + .32 * light), clarity * .82);
+          float clarity = exp(-oceanDepth * 30.), light = caustics(vOceanPoint);
+          water = mix(water, uSeabed * (.9 + .32 * light), clarity * .8);
           water += vec3(.10, .16, .14) * light * exp(-oceanDepth * 8.) * (1. - clarity * .6) * .6;
         }
         diffuseColor.rgb = water;
-        if (oceanDepth < .17) {
-          // Foam: a broken line just offshore plus wave fronts rolling in; the waterline itself stays sandy so
-          // the mesh intersection with the terrain is never outlined.
+        if (oceanDepth < .11) {
+          // Foam: a thin, broken line just offshore plus faint wave fronts rolling in; the waterline itself stays sandy
+          // so the mesh intersection with the terrain is never outlined.
           float breakup = planetNoise(vOceanPoint * 17. + uOceanTime * .18);
-          float line = smoothstep(.018, .034, oceanDepth) * (1. - smoothstep(.05, .075, oceanDepth));
-          float fronts = .5 + .5 * sin(oceanDepth * 115. + uOceanTime * 1.7 + breakup * 3.);
-          float rolling = smoothstep(.84, .97, fronts) * smoothstep(.03, .06, oceanDepth) * (1. - smoothstep(.09, .16, oceanDepth));
-          float foam = max(line * smoothstep(.25, .6, breakup + .2), rolling * smoothstep(.35, .7, breakup)) * (.88 + uRain * .1);
+          float line = smoothstep(.014, .024, oceanDepth) * (1. - smoothstep(.032, .046, oceanDepth));
+          float fronts = .5 + .5 * sin(oceanDepth * 130. + uOceanTime * 1.7 + breakup * 3.);
+          float rolling = smoothstep(.9, .98, fronts) * smoothstep(.03, .05, oceanDepth) * (1. - smoothstep(.07, .11, oceanDepth));
+          float foam = max(line * smoothstep(.3, .65, breakup + .1), rolling * smoothstep(.45, .75, breakup) * .5) * (.75 + uRain * .15);
           diffuseColor.rgb = mix(water, uFoam, foam);
         }
       `);
@@ -141,7 +142,7 @@ export class Ocean {
         reflectedLight.directSpecular *= cloudShadow;
       `);
     };
-    material.customProgramCacheKey = () => 'planet-ocean-baked-v3';
+    material.customProgramCacheKey = () => 'planet-ocean-baked-v4';
     this.mesh = new THREE.Mesh(geometry, material); this.mesh.name = 'continuous-ocean-sphere';
     this.mesh.castShadow = this.mesh.receiveShadow = false;
   }
