@@ -342,10 +342,11 @@ const builders: Partial<Record<BuildingType, () => THREE.Group>> = { house, fora
 function buildTemplate(type: BuildingType) {
   const g = builders[type]?.() ?? eraModel(type);
   mergeMeshes(g);
-  // Flat ground details and flagged parts (glows, orbital pieces) stay out of the shadow pass.
+  // Flat ground details, light shells and flagged parts (glows, orbital pieces) stay out of the shadow pass. With VSM
+  // every shadow receiver is drawn into the shadow map as well, so parts that must not cast stop receiving too.
   g.traverse(o => {
     if (o instanceof THREE.Mesh && (o.material as THREE.Material).userData.ground) o.castShadow = false;
-    if (o.userData.noShadow) o.traverse(c => { if (c instanceof THREE.Mesh) c.castShadow = false; });
+    if (o.userData.noShadow || (o instanceof THREE.Mesh && (o.material as THREE.Material).userData.noShadow)) o.traverse(c => { if (c instanceof THREE.Mesh) c.castShadow = c.receiveShadow = false; });
   });
   return g;
 }

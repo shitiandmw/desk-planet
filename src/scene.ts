@@ -236,16 +236,28 @@ export class WoodlandScene {
     this.autoRotate = false;
     const definition = BUILDINGS[b.type], n = directionVector(SITE_BY_ID.get(b.siteId)!.direction);
     const facing = new THREE.Quaternion().setFromUnitVectors(NORTH, n).multiply(new THREE.Quaternion().setFromAxisAngle(NORTH, b.yaw));
-    const height = definition.tall ? (b.type === 'elevator' ? 3.6 : 1.5) : .75, mobile = this.host.clientWidth < 760;
+    const height = definition.tall ? THREE.MathUtils.clamp(this.modelHeight(view.root), 1.5, 3.6) : .75, mobile = this.host.clientWidth < 760;
     const distance = (definition.radius * 3.4 + height * 1.25 + 1.1) * (mobile ? 1.35 : 1), elevation = .5;
-    const azimuth = this.clearAzimuth(view.root, n, facing, height * .45, distance, elevation);
+    const azimuth = this.clearAzimuth(view.root, n, facing, height * .5, distance, elevation);
     const front = vec(Math.sin(azimuth), 0, Math.cos(azimuth)).applyQuaternion(facing), side = new THREE.Vector3().crossVectors(n, front);
     const rotation = new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(side, n, front)).invert();
-    const targetEnd = vec(0, onSurface(n).length() + height * .45, 0);
+    const targetEnd = vec(0, onSurface(n).length() + height * .5, 0);
     const end = targetEnd.clone().add(vec(0, Math.sin(elevation), Math.cos(elevation)).multiplyScalar(distance));
     if (this.reducedMotion) { this.camera.position.copy(end); this.controls.target.copy(targetEnd); this.world.quaternion.copy(rotation); this.updateZoomLimit(); this.controls.update(); }
     else this.cameraMove = { start: this.camera.position.clone(), end, targetStart: this.controls.target.clone(), targetEnd, rotationStart: this.world.quaternion.clone(), rotationEnd: rotation, time: 0 };
     this.dirty = true; this.selectBuilding(id);
+  }
+  /** Top of the visible, opaque model in planet units; beams, holograms and glass halos don't count. */
+  private modelHeight(root: THREE.Object3D) {
+    root.updateMatrixWorld(true);
+    const local = root.matrixWorld.clone().invert(), box = new THREE.Box3(), part = new THREE.Box3(), matrix = new THREE.Matrix4();
+    root.traverseVisible(o => {
+      const mesh = o as THREE.Mesh;
+      if (!mesh.isMesh || [mesh.material].flat().every(m => m.transparent)) return;
+      if (!mesh.geometry.boundingBox) mesh.geometry.computeBoundingBox();
+      box.union(part.copy(mesh.geometry.boundingBox!).applyMatrix4(matrix.multiplyMatrices(local, mesh.matrixWorld)));
+    });
+    return box.isEmpty() ? 0 : box.max.y * root.scale.y;
   }
   /** Prefers a front three-quarter view, then sides and back, keeping the first that no tree, rock or neighbour hides. */
   private clearAzimuth(target: THREE.Object3D, n: THREE.Vector3, facing: THREE.Quaternion, lift: number, distance: number, elevation: number) {

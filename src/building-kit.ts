@@ -130,6 +130,128 @@ const dirtMap = texture(256, 89, (ctx, s, r) => {
   speckle(ctx, s, r, 6000, '96,80,52', '240,226,186', .16);
 });
 
+// ---------------------------------------------------------------- later-era surfaces
+/** Industrial setts: dark rounded cobbles in offset courses, sooty joints. */
+const cobbleMap = texture(256, 97, (ctx, s, r) => {
+  ctx.fillStyle = '#4f4a42'; ctx.fillRect(0, 0, s, s);
+  const rows = 14, h = s / rows;
+  for (let row = 0; row < rows; row++) {
+    let x = -r() * 20;
+    while (x < s) {
+      const w = 14 + r() * 12, k = .78 + r() * .38, color = [128 * k, 122 * k, 112 * k + r() * 6].map(Math.round).join(',');
+      for (const dx of [0, s]) {
+        ctx.fillStyle = `rgb(${color})`; ctx.beginPath(); ctx.roundRect(x - dx + 1.4, row * h + 1.4, w - 2.8, h - 2.8, 4); ctx.fill();
+        ctx.fillStyle = 'rgba(255,248,230,.16)'; ctx.fillRect(x - dx + 3, row * h + 2.4, w - 6, 2);
+      }
+      x += w;
+    }
+  }
+  for (let i = 0; i < 26; i++) blob(ctx, s, r() * s, r() * s, 10 + r() * 34, r() > .5 ? '40,36,30' : '200,190,170', .07 + r() * .07);
+  speckle(ctx, s, r, 2600, '40,36,30', '230,222,206', .12);
+});
+/** Asphalt with fine aggregate, patching and worn lighter tracks. */
+const asphaltMap = texture(256, 101, (ctx, s, r) => {
+  ctx.fillStyle = '#6a6d6f'; ctx.fillRect(0, 0, s, s);
+  for (let i = 0; i < 40; i++) blob(ctx, s, r() * s, r() * s, 12 + r() * 46, r() > .5 ? '58,60,62' : '150,152,150', .06 + r() * .07);
+  speckle(ctx, s, r, 9000, '40,42,44', '190,190,186', .2);
+});
+/** Pale composite paving for the intelligence era: large tiles, hairline joints and small inset studs. */
+const compositeMap = texture(256, 103, (ctx, s, r) => {
+  ctx.fillStyle = '#bfc4c4'; ctx.fillRect(0, 0, s, s); const n = 4, cell = s / n;
+  for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
+    ctx.fillStyle = `rgb(${jitter([222, 225, 222], r, 8)})`; ctx.beginPath(); ctx.roundRect(x * cell + 1, y * cell + 1, cell - 2, cell - 2, 5); ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,.35)'; ctx.fillRect(x * cell + 3, y * cell + 2.5, cell - 6, 1.5);
+  }
+  for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) { ctx.fillStyle = '#9fa7aa'; ctx.beginPath(); ctx.arc(x * cell, y * cell, 3.2, 0, Math.PI * 2); ctx.fill(); }
+  speckle(ctx, s, r, 1200, '120,126,128', '255,255,255', .06);
+});
+/** Flat-topped hexagonal deck plates; rows are squeezed by 13 % so four columns and four rows repeat seamlessly. */
+const hexMap = texture(256, 107, (ctx, s, r) => {
+  ctx.fillStyle = '#1c2024'; ctx.fillRect(0, 0, s, s);
+  const a = s / 6, rowH = s / 4, squash = .866;
+  const hex = (cx: number, cy: number, inset: number) => { ctx.beginPath(); for (let k = 0; k < 6; k++) { const t = k * Math.PI / 3; ctx.lineTo(cx + Math.cos(t) * (a - inset), cy + Math.sin(t) * (a - inset) * squash); } ctx.closePath(); };
+  for (let col = 0; col < 4; col++) for (let row = 0; row < 4; row++) {
+    const k = .86 + r() * .26, cx = col * a * 1.5, cy = row * rowH + (col % 2) * rowH / 2, tone = [68 * k, 74 * k, 80 * k].map(Math.round).join(','), bolt = r() > .6;
+    for (const dx of [-s, 0, s]) for (const dy of [-s, 0, s]) {
+      ctx.fillStyle = `rgb(${tone})`; hex(cx + dx, cy + dy, 1.6); ctx.fill();
+      ctx.strokeStyle = 'rgba(200,210,220,.14)'; ctx.lineWidth = 1.2; hex(cx + dx, cy + dy, 3.4); ctx.stroke();
+      if (bolt) { ctx.fillStyle = 'rgba(20,22,26,.6)'; ctx.beginPath(); ctx.arc(cx + dx, cy + dy, 2.2, 0, 7); ctx.fill(); }
+    }
+  }
+  speckle(ctx, s, r, 1800, '10,12,14', '200,210,220', .08);
+});
+/** Riveted steel plate, drawn near white so a vertex tint gives iron, boiler green or tank grey. */
+const rivetMap = texture(256, 109, (ctx, s, r) => {
+  ctx.fillStyle = '#d8d8d6'; ctx.fillRect(0, 0, s, s);
+  const rows = 3, cols = 4, h = s / rows, w = s / cols;
+  for (let row = 0; row < rows; row++) for (let i = -1; i <= cols; i++) {
+    const x = i * w + (row % 2) * w / 2, y = row * h;
+    const k = .93 + r() * .1; ctx.fillStyle = `rgb(${Math.round(226 * k)},${Math.round(226 * k)},${Math.round(223 * k)})`; ctx.fillRect(x + 1.5, y + 1.5, w - 3, h - 3);
+    ctx.fillStyle = 'rgba(70,64,56,.08)'; ctx.fillRect(x + 1.5, y + h * .55, w - 3, h * .45 - 1.5);
+    ctx.fillStyle = '#8f8f8b'; for (let k = 0; k < 8; k++) for (const [px, py] of [[x + 5 + k * (w - 10) / 7, y + 5], [x + 5 + k * (w - 10) / 7, y + h - 5]]) { ctx.beginPath(); ctx.arc(px, py, 1.9, 0, 7); ctx.fill(); ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.arc(px - .5, py - .6, .8, 0, 7); ctx.fill(); ctx.fillStyle = '#8f8f8b'; }
+  }
+  for (let i = 0; i < 18; i++) { const x = r() * s, y = r() * s; const g = ctx.createLinearGradient(x, y, x, y + 40); g.addColorStop(0, 'rgba(90,70,50,.14)'); g.addColorStop(1, 'rgba(90,70,50,0)'); ctx.fillStyle = g; ctx.fillRect(x, y, 3 + r() * 5, 40); }
+  speckle(ctx, s, r, 1400, '60,60,58', '255,255,255', .08);
+});
+/** Smooth composite cladding for the intelligence era: large rounded panels with hairline joints and vent slots. */
+const panelMap = texture(256, 113, (ctx, s, r) => {
+  ctx.fillStyle = '#d4d8da'; ctx.fillRect(0, 0, s, s);
+  const cols = 2, rows = 3, w = s / cols, h = s / rows;
+  for (let row = 0; row < rows; row++) for (let i = -1; i <= cols; i++) {
+    const x = i * w + (row % 2) * w / 2, y = row * h;
+    ctx.fillStyle = `rgb(${jitter([248, 249, 249], r, 5)})`; ctx.beginPath(); ctx.roundRect(x + 1, y + 1, w - 2, h - 2, 6); ctx.fill();
+  }
+  ctx.fillStyle = 'rgba(150,158,162,.4)'; for (let k = 0; k < 5; k++) ctx.fillRect(s * .62, s * .12 + k * 3.2, 22, 1.2);
+  ctx.fillStyle = 'rgba(150,158,162,.35)'; ctx.fillRect(s * .1, s * .78, 14, 3);
+});
+/** Spacecraft plating: irregular titanium plates, bolts at the corners and a few darker service panels. */
+const hullMap = texture(256, 127, (ctx, s, r) => {
+  ctx.fillStyle = '#a3a7aa'; ctx.fillRect(0, 0, s, s);
+  const rows = [48, 32, 56, 40, 36, 44]; let y = 0; const scale = s / rows.reduce((a, b) => a + b, 0);
+  for (const row of rows) {
+    const h = row * scale; let x = -r() * 30;
+    while (x < s) {
+      const w = 26 + r() * 60, dark = r() > .94, k = .96 + r() * .05, color = (dark ? [192, 197, 200] : [238 * k, 240 * k, 240 * k]).map(Math.round).join(',');
+      for (const dx of [0, s]) {
+        ctx.fillStyle = `rgb(${color})`; ctx.fillRect(x - dx + 1.2, y + 1.2, w - 2.4, h - 2.4);
+        ctx.fillStyle = 'rgba(120,124,128,.9)'; for (const [px, py] of [[x - dx + 4, y + 4], [x - dx + w - 4, y + 4], [x - dx + 4, y + h - 4], [x - dx + w - 4, y + h - 4]]) ctx.fillRect(px - 1, py - 1, 2, 2);
+        if (r() > .82) { ctx.fillStyle = 'rgba(70,74,78,.35)'; for (let k = 0; k < 4; k++) ctx.fillRect(x - dx + 8, y + 8 + k * 3, Math.min(30, w - 16), 1); }
+      }
+      x += w;
+    }
+    y += h;
+  }
+  speckle(ctx, s, r, 1200, '90,94,98', '255,255,255', .06);
+});
+/** Information-era LED screens: charts, ticker lines and a logo on navy, used as both colour and glow. */
+const screenMap = hiRes(256, (ctx, s) => {
+  const r = rng(131);
+  ctx.fillStyle = '#0d1d33'; ctx.fillRect(0, 0, s, s);
+  const g = ctx.createLinearGradient(0, 0, s, s); g.addColorStop(0, 'rgba(60,140,255,.35)'); g.addColorStop(1, 'rgba(255,90,170,.2)'); ctx.fillStyle = g; ctx.fillRect(0, 0, s, s);
+  const colors = ['#3fd2ff', '#ffb347', '#ff5f8f', '#8cff9a', '#ffffff'];
+  for (let i = 0; i < 9; i++) { const h = 20 + r() * 70; ctx.fillStyle = colors[i % 4]; ctx.fillRect(16 + i * 13, 120 - h, 9, h); }
+  ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 3; ctx.beginPath(); for (let i = 0; i <= 12; i++) ctx.lineTo(140 + i * 9, 92 - Math.sin(i * .8) * 18 - i * 2.4); ctx.stroke();
+  ctx.fillStyle = '#ffb347'; ctx.beginPath(); ctx.arc(196, 42, 22, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#0d1d33'; ctx.beginPath(); ctx.arc(196, 42, 12, 0, Math.PI * 2); ctx.fill();
+  for (let i = 0; i < 8; i++) { ctx.fillStyle = colors[(i + 2) % 5]; ctx.globalAlpha = .85; ctx.fillRect(16, 142 + i * 13, 60 + r() * 150, 6); }
+  ctx.globalAlpha = 1; ctx.fillStyle = '#3fd2ff'; ctx.fillRect(0, s - 12, s, 12);
+});
+/** Smoked glass with glowing floor lines; the glow layer carries cyan and violet lit cells. */
+const darkGlassMap = hiRes(256, (ctx, s) => {
+  ctx.fillStyle = '#5a6670'; ctx.fillRect(0, 0, s, s); const n = 4, cell = s / n;
+  for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
+    const g = ctx.createLinearGradient(x * cell, y * cell, x * cell + cell, y * cell + cell); g.addColorStop(0, '#41566a'); g.addColorStop(.5, '#1d2731'); g.addColorStop(1, '#121920');
+    ctx.fillStyle = g; ctx.fillRect(x * cell + 2, y * cell + 2, cell - 4, cell - 7);
+  }
+});
+const darkGlassGlowMap = hiRes(256, (ctx, s) => {
+  const r = rng(137); ctx.fillStyle = '#000'; ctx.fillRect(0, 0, s, s); const n = 4, cell = s / n;
+  for (let y = 0; y < n; y++) { ctx.fillStyle = '#2fd8ff'; ctx.fillRect(0, y * cell + cell - 5, s, 2); }
+  for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) if (r() > .7) { ctx.fillStyle = r() > .3 ? 'rgba(120,220,255,.32)' : 'rgba(150,110,255,.3)'; ctx.fillRect(x * cell + 2, y * cell + 2, cell - 4, cell - 7); }
+});
+/** Alpha ramp for light beams: opaque at the base (v = 0), gone at the top. */
+const fadeMap = canvasTexture(64, (ctx, s) => { const g = ctx.createLinearGradient(0, 0, 0, s); g.addColorStop(0, '#000'); g.addColorStop(.55, '#555'); g.addColorStop(1, '#fff'); ctx.fillStyle = g; ctx.fillRect(0, 0, s, s); });
+fadeMap.colorSpace = THREE.NoColorSpace; fadeMap.wrapS = fadeMap.wrapT = THREE.ClampToEdgeWrapping;
+
 const std = (p: THREE.MeshStandardMaterialParameters) => new THREE.MeshStandardMaterial({ roughness: .9, ...p });
 const bumped = (map: THREE.Texture, bumpScale: number, p: THREE.MeshStandardMaterialParameters = {}) => std({ map, bumpMap: map, bumpScale, ...p });
 
@@ -152,19 +274,42 @@ export const M = {
   metal: std({ vertexColors: true, roughness: .36, metalness: .62 }),
   glass: std({ color: '#3f5c66', roughness: .1, metalness: .25, emissive: '#ffc977', emissiveIntensity: .03 }),
   lamp: std({ color: '#fff1c8', emissive: '#ffcf7d', emissiveIntensity: .45 }),
-  cyan: std({ color: '#c9fbff', emissive: '#38d7ff', emissiveIntensity: 1.25, roughness: .4 }),
+  cyan: std({ color: '#06323d', emissive: '#00c2ff', emissiveIntensity: 1.15, roughness: .4 }),
   red: std({ color: '#ffb0a0', emissive: '#ff3b22', emissiveIntensity: 1.4 }),
   fire: new THREE.MeshBasicMaterial({ color: '#ffad54' }),
   water: std({ color: '#5fb6bf', roughness: .12, metalness: .1 }),
+  // Later eras: each has its own ground, cladding and light so a district reads as one period from orbit.
+  cobble: bumped(cobbleMap, .012, { roughness: .95 }),
+  asphalt: bumped(asphaltMap, .004, { roughness: .97 }),
+  composite: bumped(compositeMap, .004, { roughness: .62 }),
+  hexDeck: bumped(hexMap, .006, { roughness: .5, metalness: .35 }),
+  rivet: bumped(rivetMap, .01, { vertexColors: true, roughness: .55, metalness: .45 }),
+  panel: std({ map: panelMap, vertexColors: true, roughness: .3, metalness: .08 }),
+  hull: bumped(hullMap, .004, { vertexColors: true, roughness: .34, metalness: .5 }),
+  screen: std({ map: screenMap, emissiveMap: screenMap, emissive: '#ffffff', emissiveIntensity: .85, roughness: .3 }),
+  darkGlass: std({ map: darkGlassMap, emissiveMap: darkGlassGlowMap, emissive: '#ffffff', emissiveIntensity: .8, roughness: .12, metalness: .45 }),
+  clearGlass: std({ color: '#d6f1f7', transparent: true, opacity: .26, roughness: .05, metalness: .2, depthWrite: false }),
+  violet: std({ color: '#1c0b40', emissive: '#7040ff', emissiveIntensity: 1.25, roughness: .4 }),
+  amber: std({ color: '#3a1a06', emissive: '#ff7a1a', emissiveIntensity: 1.25, roughness: .4 }),
+  /**
+   * Translucent light shells: holograms, halos and force fields. Normal blending tints what lies behind, so they stay
+   * coloured against a bright daytime sky where additive light would only turn white. Never cast shadows.
+   */
+  holo: new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, opacity: .3, depthWrite: false, side: THREE.DoubleSide }),
+  /** Light shafts that fade out along the geometry's v coordinate. */
+  beam: new THREE.MeshBasicMaterial({ vertexColors: true, alphaMap: fadeMap, transparent: true, opacity: .55, depthWrite: false, side: THREE.DoubleSide }),
 };
 for (const m of [M.paint, M.metal]) m.color.set('#ffffff');
+// Light sources and see-through shells throw no shadow (see buildTemplate for how they leave the shadow pass).
+for (const m of [M.holo, M.beam, M.clearGlass, M.cyan, M.violet, M.amber]) m.userData.noShadow = true;
 
-const reflective = [M.glass, M.metal, M.facade, M.solar, M.corrugated, M.water];
+const reflective = [M.glass, M.metal, M.facade, M.solar, M.corrugated, M.water, M.rivet, M.panel, M.hull, M.darkGlass, M.clearGlass, M.hexDeck];
 /** Sky reflections for glass and metal; set once the renderer has a PMREM environment. */
 export function setBuildingEnvironment(env: THREE.Texture) { for (const m of reflective) { m.envMap = env; m.envMapIntensity = m === M.metal ? .9 : .75; m.needsUpdate = true; } }
-/** Windows warm up in the evening light preset. */
+/** Windows warm up in the evening light preset; screens and smoked glass glow brighter. */
 export function setEveningLights(evening: boolean) {
   M.glass.emissiveIntensity = evening ? .85 : .03; M.lamp.emissiveIntensity = evening ? 1.6 : .45; M.facade.emissiveIntensity = evening ? .75 : .04;
+  M.darkGlass.emissiveIntensity = evening ? 1.5 : .8; M.screen.emissiveIntensity = evening ? 1.25 : .85;
 }
 
 // ---------------------------------------------------------------- geometry helpers
@@ -192,14 +337,18 @@ export function tint(geo: THREE.BufferGeometry, color: THREE.ColorRepresentation
   geo.setAttribute('color', new THREE.Float32BufferAttribute(data, 3)); return geo;
 }
 const textured = (m: THREE.Material) => !!(m as THREE.MeshStandardMaterial).map;
+/** Vertex-tinted materials picked by a colour-string prefix, e.g. `hull:#d9dde0`. */
+const TINTED: Record<string, THREE.Material> = { metal: M.metal, rivet: M.rivet, panel: M.panel, hull: M.hull, holo: M.holo, beam: M.beam };
 /**
- * Adds a mesh. A colour string selects the shared vertex-coloured paint; `metal:` prefixes pick the metallic variant.
- * Textured materials get box-projected UVs unless the geometry is flagged `userData.keepUV`.
+ * Adds a mesh. A colour string selects the shared vertex-coloured paint; prefixes such as `metal:`, `rivet:`, `panel:`,
+ * `hull:`, `holo:` and `beam:` pick a tinted variant. Textured materials get box-projected UVs unless the geometry is
+ * flagged `userData.keepUV`.
  */
 export function add(parent: THREE.Object3D, geo: THREE.BufferGeometry, mat: Paint, at: V3 = [0, 0, 0], rot?: V3, uvScale = 1.6) {
   let material: THREE.Material;
-  if (typeof mat === 'string') { const metal = mat.startsWith('metal:'); tint(geo, metal ? mat.slice(6) : mat); material = metal ? M.metal : M.paint; }
-  else { material = mat; if (textured(mat) && !geo.userData.keepUV) projectUV(geo, uvScale); }
+  if (typeof mat === 'string') { const split = mat.indexOf(':'); material = split < 0 ? M.paint : TINTED[mat.slice(0, split)] ?? M.paint; tint(geo, mat.slice(split + 1)); }
+  else material = mat;
+  if (textured(material) && !geo.userData.keepUV) projectUV(geo, uvScale);
   const m = new THREE.Mesh(geo, material); m.castShadow = m.receiveShadow = true; m.position.set(...at); if (rot) m.rotation.set(...rot);
   parent.add(m); return m;
 }
