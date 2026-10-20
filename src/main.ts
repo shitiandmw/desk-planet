@@ -1,7 +1,8 @@
 import './style.css';
 import { GameSimulation, type ActionResult } from './simulation';
-import { BUILDABLE, BUILDINGS, TECHNOLOGIES, RESOURCE_KEYS, BASIC_RESOURCES, INDUSTRY_RESOURCES, RESOURCE_NAMES, CIVILIZATION_ERAS, GROWTH_SECONDS, type BuildingType, type Stock, type Resource, type TechId } from './game-data';
-import { SITE_BY_ID } from './world-layout';
+import { BUILDABLE, BUILDINGS, TECHNOLOGIES, RESOURCE_KEYS, BASIC_RESOURCES, INDUSTRY_RESOURCES, RESOURCE_NAMES, CIVILIZATION_ERAS, GROWTH_SECONDS, BUILDING_ERAS, SANDBOX_BUILDABLE, type BuildingEra, type BuildingType, type Direction, type Stock, type Resource, type TechId } from './game-data';
+import { SITE_BY_ID, directionVector } from './world-layout';
+import { buildAllEras, buildEra, clearSandbox, eraProgress, ERA_DISTRICTS } from './sandbox';
 import { WoodlandScene, type ViewName } from './scene';
 import type { WeatherMode } from './weather-state';
 
@@ -37,6 +38,28 @@ const icons: Record<string,string> = {
   plus:'<path d="M12 5v14M5 12h14"/>', minus:'<path d="M5 12h14"/>',
   arrow:'<path d="M5 12h14m-6-6 6 6-6 6"/>',
   globe:'<circle cx="12" cy="12" r="9"/><ellipse cx="12" cy="12" rx="4" ry="9"/><path d="M3 12h18"/>',
+  windmill:'<path d="m12 9-7-6m7 6 7-6m-7 6-7 6m7-6 7 6M9 21l1.5-10h3L15 21Z"/>',
+  townhouse:'<path d="M3 21V10l9-7 9 7v11ZM9 21v-6h4v6m3-9h2v3h-2ZM6 12h2v3H6Z"/>',
+  market:'<path d="M3 9h18l-2-5H5ZM3 9c0 2.5 4.5 2.5 4.5 0 0 2.5 4.5 2.5 4.5 0 0 2.5 4.5 2.5 4.5 0 0 2.5 4.5 2.5 4.5 0M5 11v10h14V11M9 21v-5h6v5"/>',
+  power:'<path d="M4 21c2-5 2-11 0-16h8c-2 5-2 11 0 16ZM18 7l-2.5 5H19l-2.5 5"/>',
+  factory:'<path d="M2 21V10l5-4v4l5-4v4l5-4v4h4v11ZM6 16h2m4 0h2m4 0h1"/>',
+  tenement:'<path d="M5 21V4h14v17M9 8h2m2 0h2M9 12h2m2 0h2M9 16h2m2 0h2M10 21v-2h4v2M8 4V2h2v2"/>',
+  depot:'<path d="M2 20v-9a10 6 0 0 1 20 0v9M6 20v-6h12v6M2 20h20M6 17h12"/>',
+  apartment:'<path d="M7 21V3h10v18M4 21h16M10 6h4m-4 4h4m-4 4h4m-4 4h4"/>',
+  telecom:'<path d="M12 7v14m-4 0 4-14 4 14M9.5 15h5M7 4.5a7 7 0 0 1 10 0M9.5 7a3.5 3.5 0 0 1 5 0"/>',
+  lab:'<path d="M3 21v-9h8v9m0 0h10v-7a5 5 0 0 0-10 0M16 9V6m-10 9h2m-2 3h2"/>',
+  chipfab:'<rect x="7" y="7" width="10" height="10" rx="1"/><path d="M10 3v4m4-4v4m-4 10v4m4-4v4M3 10h4m-4 4h4m10-4h4m-4 4h4"/>',
+  windfarm:'<path d="M12 10v11m-3 0h6M12 10 9 2.5M12 10l7.5 2.5M12 10l-5.5 5.5"/>',
+  datacenter:'<rect x="4" y="3" width="16" height="6" rx="1"/><rect x="4" y="9" width="16" height="6" rx="1"/><rect x="4" y="15" width="16" height="6" rx="1"/><path d="M7.5 6h.01M7.5 12h.01M7.5 18h.01M12 6h5m-5 6h5m-5 6h5"/>',
+  robotics:'<path d="M3 21h9M7.5 21v-4l4.5-6 5 2.5M12 11 9.5 6.5M17 13.5l2 3m-2-3 3-1.5"/><circle cx="12" cy="11" r="1.5"/>',
+  autofactory:'<path d="M3 21a9 9 0 0 1 18 0ZM9 21v-4h6v4M15 5h6m-3 0v3m-2 0h4"/>',
+  fusion:'<ellipse cx="12" cy="14" rx="9" ry="4.5"/><ellipse cx="12" cy="14" rx="4" ry="1.8"/><path d="M12 2v5m-3-2 3 2 3-2"/>',
+  ecotower:'<path d="M8 21V6h8v15M5 21h14M8 10H5.5M16 10h2.5M8 15H5.5m10.5 0h2.5"/><path d="M12 6c-2-2 0-4 0-4s2 2 0 4"/>',
+  launchpad:'<path d="M12 2c3 3 3 9 2 14h-4c-1-5-1-11 2-14ZM10 16l-3 4m7-4 3 4M12 10h.01M5 22h14"/>',
+  spaceport:'<path d="M2 21h20M5 21v-5h14v5M12 16V9M7 8a5 2 0 0 0 10 0 5 2 0 0 0-10 0"/>',
+  elevator:'<path d="M12 2v20M7 22h10M9 10h6v5H9ZM5 3h14"/>',
+  deepradar:'<path d="M3.5 9.5a9 9 0 0 0 11 9Z"/><path d="m9 14 6-6m0 0 2-2M11 21h8m-4-6v6"/>',
+  shipyard:'<path d="M3 21V5h18v16M3 5l4 4h10l4-4M6 15h12l-2.5 3h-7Z"/>',
   check:'<path d="m5 12 4 4L19 6"/>', pause:'<path d="M8 5v14m8-14v14"/>', play:'<path d="m8 5 11 7-11 7Z"/>',
 };
 const icon=(name:string,size=20)=>`<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${icons[name]||icons.tree}</svg>`;
@@ -47,17 +70,21 @@ const cost=(value:Partial<Stock>)=>RESOURCE_KEYS.filter(r=>(value[r]||0)>0).map(
 const stockText=(value:Partial<Stock>,factor=1)=>RESOURCE_KEYS.filter(r=>(value[r]||0)>0).map(r=>`${Math.round((value[r]||0)*factor*10)/10} ${RESOURCE_NAMES[r]}`).join(' · ');
 const resourceChip=(r:Resource,n?:number)=>`<button class="resource-chip" data-resource="${r}">${icon(r,13)}${n===undefined?'':n+' '}${RESOURCE_NAMES[r]}</button>`;
 const recipe=(type:BuildingType)=>{const d=BUILDINGS[type];return d.output?`<div class="recipe">${RESOURCE_KEYS.filter(r=>(d.inputs?.[r]||0)>0).map(r=>resourceChip(r,d.inputs![r])).join('+')}${d.inputs?'<span>→</span>':''}${resourceChip(d.output,d.yield)}</div><small class="recipe-time">基础每岗周期 ${d.cycle} 游戏秒${d.inputs?'；配方完成时扣除原料。':'。'}</small>`:'';};
-const buildingSummary=(type:BuildingType)=>{const d=BUILDINGS[type];return d.capacity?'住房 +'+d.capacity:d.storage?'食物容量 +'+d.storage:type==='well'?'附近农田产量 +25%':type==='workshop'?'科研与生产改良':`${d.jobs} 个${RESOURCE_NAMES[d.output!]}岗位`;};
+const eraShort=(type:BuildingType)=>BUILDING_ERAS.find(e=>e.id===BUILDINGS[type].era)!.short;
+const buildingSummary=(type:BuildingType)=>{const d=BUILDINGS[type];return d.concept?d.description.split(/[，。]/)[0]:d.capacity?'住房 +'+d.capacity:d.storage?'食物容量 +'+d.storage:type==='well'?'附近农田产量 +25%':type==='workshop'?'科研与生产改良':`${d.jobs} 个${RESOURCE_NAMES[d.output!]}岗位`;};
 const meter=(id:string)=>`<div class="meter"><span id="${id}"></span></div>`;
 const button=(action:string,label:string,cls='secondary')=>`<button class="${cls}" data-action="${action}">${label}</button>`;
 const counter=(kind:string,label:string)=>`<div class="counter"><button data-action="${kind}-minus" aria-label="减少${label}">${icon('minus',14)}</button><b id="${kind}-count"></b><button data-action="${kind}-plus" aria-label="增加${label}">${icon('plus',14)}</button></div>`;
-const STORAGE='mini-planet-game-v1';
-let sim=new GameSimulation(),restored=false,storageFailed=false,invalidSave=false;
-try{const raw=localStorage.getItem(STORAGE);if(raw){let parsed:unknown;try{parsed=JSON.parse(raw);}catch{invalidSave=true;}const saved=GameSimulation.load(parsed);if(saved){sim=saved;restored=true;if((parsed as {version:number}).version===1&&!localStorage.getItem(STORAGE+'-v1-backup'))localStorage.setItem(STORAGE+'-v1-backup',raw);}else{invalidSave=true;localStorage.setItem(STORAGE+'-unreadable-backup',raw);}}}catch{storageFailed=true;}
+/** `?test` opens a separate test planet: every model of every era, free and instant, saved under its own key. */
+const SANDBOX=new URLSearchParams(location.search).has('test');
+const STORAGE=SANDBOX?'mini-planet-game-v1-sandbox':'mini-planet-game-v1';
+const modeURL=(test:boolean)=>{const url=new URL(location.href);url.search=test?'?test':'';url.hash='';return url.href;};
+let sim=SANDBOX?GameSimulation.createSandbox():new GameSimulation(),restored=false,storageFailed=false,invalidSave=false;
+try{const raw=localStorage.getItem(STORAGE);if(raw){let parsed:unknown;try{parsed=JSON.parse(raw);}catch{invalidSave=true;}const saved=GameSimulation.load(parsed,{sandbox:SANDBOX});if(saved){sim=saved;restored=true;if(!SANDBOX&&(parsed as {version:number}).version===1&&!localStorage.getItem(STORAGE+'-v1-backup'))localStorage.setItem(STORAGE+'-v1-backup',raw);}else if(!SANDBOX){invalidSave=true;localStorage.setItem(STORAGE+'-unreadable-backup',raw);}}}catch{storageFailed=true;}
 let scene:WoodlandScene,panel:'overview'|'catalog'|'building'|'research'|'placement'|'economy'='overview';
 let restarting=false,selectedResource:Resource='food',catalogCategory='all',lastChapter=-1;
 let selected:string|null=null,panelKey='',toastTimer=0,lastRender=0,lastSave=0,lastEvent=0,warm=false;
-function save(){if(restarting)return;try{localStorage.setItem(STORAGE,JSON.stringify(sim.save()));storageFailed=false;lastSave=performance.now();}catch{storageFailed=true;}setText('save-status',storageFailed?'浏览器未允许保存':'已保存到此浏览器');}
+function save(){if(restarting)return;try{localStorage.setItem(STORAGE,JSON.stringify(sim.save()));storageFailed=false;lastSave=performance.now();}catch{storageFailed=true;}setText('save-status',storageFailed?'浏览器未允许保存':SANDBOX?'测试星球已单独保存':'已保存到此浏览器');}
 function toast(message:string){$('toast').textContent=message;$('toast').classList.add('visible');clearTimeout(toastTimer);toastTimer=window.setTimeout(()=>$('toast').classList.remove('visible'),3600);}
 function setText(id:string,text:string){const el=$(id);if(el&&el.textContent!==text)el.textContent=text;}
 function disable(id:string,value:boolean){$(id)?.toggleAttribute('disabled',value);}
@@ -66,9 +93,9 @@ function act(result:ActionResult){if(!result.ok)toast(result.reason);save();upda
 
 $('app').innerHTML=`
 <main aria-label="微缩星球游戏"><div id="world"></div>
-<div class="ui" id="interface">
+<div class="ui${SANDBOX?' sandbox':''}" id="interface">
   <header class="topbar">
-    <button class="brand" data-action="planet" aria-label="星球全景"><span class="brand-icon">${icon('tree',25)}</span><span>微缩星球<small>MINI PLANET</small></span></button>
+    <button class="brand" data-action="planet" aria-label="星球全景"><span class="brand-icon">${icon('tree',25)}</span><span>微缩星球<small>MINI PLANET</small></span>${SANDBOX?'<span class="test-badge">测试模式</span>':''}</button>
     <div class="resources" role="group" aria-label="共享资源与人口">
       ${BASIC_RESOURCES.map(r=>`<button class="resource ${r}" data-resource="${r}" title="${RESOURCE_NAMES[r]}：点击查看收支；显示岗位满负荷预估">${icon(r,22)}<div><span class="resource-name">${RESOURCE_NAMES[r]}</span><strong id="stock-${r}"></strong></div><span class="rate" id="rate-${r}"></span></button>`).join('')}
       <button class="resource population" data-action="overview" title="人口 / 居住名额">${icon('people',22)}<div><span class="resource-name">居民 / 住房</span><strong id="population"></strong></div></button>
@@ -76,14 +103,21 @@ $('app').innerHTML=`
     <div class="toolbar">${button('light',icon('sun'),'tool')}${button('photo',icon('camera'),'tool')}${button('help',icon('help'),'tool')}</div>
   </header>
   <div class="industry-stock" id="industry-stock" role="group" aria-label="产业资源" hidden>${INDUSTRY_RESOURCES.map(r=>`<button data-resource="${r}" title="查看${RESOURCE_NAMES[r]}的来源与用途">${icon(r,15)}<span>${RESOURCE_NAMES[r]}</span><strong id="stock-${r}">0</strong><small id="rate-${r}"></small></button>`).join('')}</div>
-  <aside class="journey" aria-label="聚落目标">
+  ${SANDBOX?`<aside class="journey sandbox-panel" aria-label="测试模式">
+    <div class="eyebrow">TEST MODE · 模型测试</div>
+    <h1>六个时代<span>，</span><br>一次看全<span>。</span></h1>
+    <p class="journey-intro">建筑免费、立即建成，可以随时移除。测试星球与正式聚落分开保存。</p>
+    <div class="era-list">${BUILDING_ERAS.map((e,i)=>`<div class="era-row" id="era-row-${e.id}" title="${e.summary}"><button class="era-focus" data-era-focus="${e.id}" aria-label="转到${e.name}片区"><span class="goal-number">0${i+1}</span><span><strong>${e.name}</strong><small id="era-progress-${e.id}"></small></span></button><button class="secondary era-build" data-era-build="${e.id}" id="era-build-${e.id}">建造</button></div>`).join('')}</div>
+    <button class="primary goal-action" data-action="sandbox-all">一键建造全部时代 ${icon('arrow',16)}</button>
+    <div class="sandbox-links">${button('sandbox-clear','清空测试建筑','quiet')}${button('sandbox-exit','退出测试模式','quiet')}</div>
+  </aside>`:`<aside class="journey" aria-label="聚落目标">
     <div class="eyebrow">CHAPTER <span id="chapter-number">01</span> · <span id="stage">采集时代</span></div>
     <h1 id="chapter-title">从一片林地<span>，</span><br>到一处家园<span>。</span></h1>
     <p class="journey-intro" id="chapter-description">在小小的星球上，<br>安顿每一份生活。</p>
     <div class="goals" id="goals">${sim.goals.map((g,i)=>`<div class="goal" id="goal-${i}"><span class="goal-number" id="goal-mark-${i}">0${i+1}</span><div><strong id="goal-title-${i}">${g.title}</strong><p id="goal-detail-${i}">${g.detail}</p></div></div>`).join('')}</div>
     <button class="primary goal-action" id="goal-action" data-action="goal">建造第一座住宅 ${icon('arrow',16)}</button>
     <p class="chapter-foot" id="goal-foot">完成三件小事，让聚落站稳脚跟。</p>
-  </aside>
+  </aside>`}
   <div class="scene-label"><span class="dot"></span><span id="scene-label">星球 01 · 林间聚落</span></div>
   <aside class="management" id="management" aria-label="聚落管理">
     <div class="panel-heading"><span class="eyebrow" id="panel-kicker">SETTLEMENT</span><button class="tool small" data-action="close-panel" aria-label="收起管理面板">${icon('close',16)}</button></div>
@@ -95,10 +129,10 @@ $('app').innerHTML=`
     <button id="weather-toggle" data-action="weather" aria-expanded="false" aria-controls="weather-menu">${icon('cloud',18)}<span id="weather-label">自动 · 晴间多云</span><span>⌄</span></button>
     <div id="weather-menu" role="group" aria-label="选择天气" hidden>${(['auto','clear','cloudy','rain'] as const).map((m,i)=>`<button data-weather="${m}" aria-pressed="${i===0}">${['自动变化','晴间多云','多云','阵雨'][i]}</button>`).join('')}</div>
   </div>
-  <div class="activity" role="group" aria-label="聚落近况"><div class="eyebrow">SETTLEMENT JOURNAL</div><p id="activity-text">${restored?`${sim.population} 位居民的聚落，正在继续生长。`:'六位居民，在这颗星球安家。'}</p><small id="save-status">${restored?'已恢复聚落进度':'进度自动保存在此浏览器'}</small></div>
+  <div class="activity" role="group" aria-label="聚落近况"><div class="eyebrow">SETTLEMENT JOURNAL</div><p id="activity-text">${SANDBOX?'测试星球：建筑免费，确认即建成。':restored?`${sim.population} 位居民的聚落，正在继续生长。`:'六位居民，在这颗星球安家。'}</p><small id="save-status">${SANDBOX?'测试进度单独保存，不影响正式聚落':restored?'已恢复聚落进度':'进度自动保存在此浏览器'}</small></div>
   <footer class="bottom-bar">
     <div class="view-controls">${button('planet',`${icon('globe',17)}<span>全景</span>`,'view')}${button('grove',`${icon('house',17)}<span>聚落</span>`,'view')}${button('back','背面','view')}</div>
-    <nav class="game-controls" aria-label="游戏操作"><button data-action="overview" id="nav-overview">${icon('people',18)}聚落</button><button data-action="catalog" id="nav-catalog">${icon('plus',19)}建设</button><button data-action="research" id="nav-research">${icon('tools',18)}科技</button></nav>
+    <nav class="game-controls" aria-label="游戏操作"><button data-action="overview" id="nav-overview">${icon('people',18)}聚落</button><button data-action="catalog" id="nav-catalog">${icon('plus',19)}建设</button><button data-action="research" id="nav-research"${SANDBOX?' hidden':''}>${icon('tools',18)}科技</button></nav>
     <div class="time-controls"><button id="pause" data-action="pause" aria-label="暂停游戏">${icon('pause',16)}</button>${[1,2,4].map(s=>`<button data-speed="${s}" aria-pressed="${sim.speed===s}">${s}×</button>`).join('')}</div>
   </footer>
   <div class="navigation-hint" id="navigation-hint">拖动转动星球 · 滚轮 / 双指缩放 · 点击建筑管理</div>
@@ -111,8 +145,9 @@ $('app').innerHTML=`
 <dt>生活</dt><dd>居民持续消耗食物。住房有空位、储粮至少 12 且食物产能有盈余时，每 35 游戏秒接纳一位新居民，消耗 6 份食物。</dd>
 <dt>建设与研究</dt><dd>确认时预留材料，施工和研究逐步消耗；取消会返还未使用部分。建造工共用，按队列施工。</dd>
 <dt>产业</dt><dd>点击顶部资源查看来源和消耗。加工设施缺料时停工，完成一轮后扣除原料。目标库存达到后停止生产，库存降低后恢复。</dd><dt>农业</dt><dd>水井覆盖附近农田，产量 +25%；粮仓增加 160 食物容量。同一农田不叠加多口井的收益。</dd><dt>节奏与存档</dt><dd>暂停和倍速同时控制建设、生产、消费与迁入。切到后台暂停推进，关闭后没有离线收益；进度只保存在当前浏览器。</dd>
-<dt>天气与观察</dt><dd>拖动球体，滚轮或双指缩放。天气自然交替，也可手动选择；天气目前不影响产量。</dd>
-</dl><div class="help-actions">${button('auto-rotate','星球自转')}${button('wind','树冠微风')}${button('export-save','导出存档')}${button('import-save','导入存档')}<button class="secondary" id="restore-save" data-action="restore-save" hidden>撤销上次导入</button>${button('reset-request','重新开始','danger')}</div><p class="note" id="help-save"></p>${button('close-help','回到聚落','primary full')}</dialog>
+<dt>天气与观察</dt><dd>拖动球体，滚轮或双指缩放。天气自然交替，也可手动选择；天气目前不影响产量。点击建筑后选「近景查看」可以凑近看模型。</dd>
+<dt>测试模式</dt><dd>${SANDBOX?'当前是测试星球：全部建筑免费、立即建成，可以随时移除；进度与正式聚落分开保存。':'在独立的测试星球上一键建造六个时代的全部建筑，查看模型与动画；不会改动当前聚落。'}</dd>
+</dl><div class="help-actions">${button('auto-rotate','星球自转')}${button('wind','树冠微风')}${SANDBOX?`${button('sandbox-clear','清空测试建筑')}${button('sandbox-exit','退出测试模式','primary')}`:`${button('enter-test','进入测试模式')}${button('export-save','导出存档')}${button('import-save','导入存档')}<button class="secondary" id="restore-save" data-action="restore-save" hidden>撤销上次导入</button>${button('reset-request','重新开始','danger')}`}</div><p class="note" id="help-save"></p>${button('close-help','回到聚落','primary full')}</dialog>
 <input id="save-file" type="file" accept=".json,application/json" aria-label="选择聚落存档" hidden>
 <dialog id="reset-dialog" aria-labelledby="reset-title"><div class="eyebrow">A NEW BEGINNING</div><h2 id="reset-title">重新安家？</h2><p>当前浏览器中的聚落进度会被替换，回到六位居民的开局。</p><div class="actions">${button('reset-cancel','保留聚落')}${button('reset-confirm','重新开始','danger')}</div></dialog>
 `;
@@ -131,7 +166,7 @@ function renderPanel(){
   const heading=(title:string,description:string)=>`<h2>${title}</h2><p class="panel-description">${description}</p>`;
   if(panel==='overview'){
     setText('panel-kicker','SETTLEMENT · 聚落');
-    html=heading(sim.currentChapter.name,'把土地、人手与资源，用在下一步发展上。')+`
+    html=(SANDBOX?heading('测试星球','资源自动补足，岗位各派一人。点击设施可近景查看或移除。'):heading(sim.currentChapter.name,'把土地、人手与资源，用在下一步发展上。'))+`
     <div class="stat-pair"><div><span>空闲居民</span><strong id="idle-count"></strong></div><div><span>居住名额</span><strong id="housing-count"></strong></div></div>
     <div class="section-title">接纳新居民 <span id="growth-percent"></span></div>${meter('growth-bar')}<p class="note" id="growth-reason"></p>
     <div class="line-item"><span>建造岗位 <small id="builder-actual"></small></span>${counter('builders','建造岗位')}</div>
@@ -142,11 +177,12 @@ function renderPanel(){
     <p class="note reserve-note" id="reserved"></p>`;
   }else if(panel==='catalog'){
     setText('panel-kicker','BUILD · 建设');
-    html=heading('给生活一点空间','选择建筑，再在球面上寻找落脚处。')+`<div class="segmented catalog-tabs">${[['all','全部'],['living','生活'],['production','生产'],['discovery','研究']].map(([id,name])=>`<button data-category="${id}" aria-pressed="${catalogCategory===id}">${name}</button>`).join('')}</div><div class="catalog">${BUILDABLE.filter(type=>catalogCategory==='all'||BUILDINGS[type].category===catalogCategory).map(type=>`<button class="build-card" data-build="${type}" id="build-${type}"><span class="build-icon">${icon(type,29)}</span><span class="build-copy"><strong>${BUILDINGS[type].name}</strong><small>${buildingSummary(type)}</small><span class="cost">${cost(BUILDINGS[type].cost)}</span></span><span class="build-state" id="build-state-${type}"></span></button>`).join('')}</div><p class="note">伐木靠近林地，采掘靠近岩丘。水井覆盖附近农田；锁定设施的科技条件会显示在卡片中。</p>${button('research','查看科技解锁','secondary full')}`;
+    if(SANDBOX)html=heading('全部建筑','免费、确认即建成。选好建筑后点击球面选址，或在左侧按时代一键建造。')+`<div class="segmented catalog-tabs era-tabs">${[['all','全部'],...BUILDING_ERAS.map(e=>[e.id,e.short])].map(([id,name])=>`<button data-category="${id}" aria-pressed="${catalogCategory===id}">${name}</button>`).join('')}</div><div class="catalog">${SANDBOX_BUILDABLE.filter(type=>catalogCategory==='all'||BUILDINGS[type].era===catalogCategory).map(type=>`<button class="build-card" data-build="${type}" id="build-${type}"><span class="build-icon">${icon(type,29)}</span><span class="build-copy"><strong>${BUILDINGS[type].name}${BUILDINGS[type].concept?'<em class="concept-badge">概念</em>':''}</strong><small>${eraShort(type)} · ${buildingSummary(type)}</small></span><span class="build-state" id="build-state-${type}"></span></button>`).join('')}</div><p class="note">「概念」建筑来自后续时代的发展计划，目前只展示模型，不参与经济结算。</p>`;
+    else html=heading('给生活一点空间','选择建筑，再在球面上寻找落脚处。')+`<div class="segmented catalog-tabs">${[['all','全部'],['living','生活'],['production','生产'],['discovery','研究']].map(([id,name])=>`<button data-category="${id}" aria-pressed="${catalogCategory===id}">${name}</button>`).join('')}</div><div class="catalog">${BUILDABLE.filter(type=>catalogCategory==='all'||BUILDINGS[type].category===catalogCategory).map(type=>`<button class="build-card" data-build="${type}" id="build-${type}"><span class="build-icon">${icon(type,29)}</span><span class="build-copy"><strong>${BUILDINGS[type].name}</strong><small>${buildingSummary(type)}</small><span class="cost">${cost(BUILDINGS[type].cost)}</span></span><span class="build-state" id="build-state-${type}"></span></button>`).join('')}</div><p class="note">伐木靠近林地，采掘靠近岩丘。水井覆盖附近农田；锁定设施的科技条件会显示在卡片中。</p>${button('research','查看科技解锁','secondary full')}`;
   }else if(panel==='placement'){
     const p=scene.preview!,d=BUILDINGS[p.type];setText('panel-kicker','PLACE · 选址');
     html=`<div class="feature-icon">${icon(p.type,34)}</div>`+heading(d.name,d.description)+`
-    <div class="cost large">${cost(d.cost)}</div><p class="note">确认后预留材料 · 基础施工 ${d.work} 工秒</p>
+    ${SANDBOX?'<p class="note">测试模式 · 免费，确认后立即建成</p>':`<div class="cost large">${cost(d.cost)}</div><p class="note">确认后预留材料 · 基础施工 ${d.work} 工秒</p>`}
     <div class="placement-status" id="placement-status"></div><p class="placement-benefit" id="placement-benefit"></p><div class="line-item"><span>所在区域</span><strong id="placement-region"></strong></div><div class="line-item"><span>朝向</span><strong id="placement-yaw"></strong></div>
     <div class="actions">${button('rotate',`${icon('reset',16)} 旋转 90°`)}${button('next-site','换一处')}</div><p class="note">点击圆点选址，拖动查看周围。确认后才会开工。</p>`;
   }else if(panel==='building'&&b){
@@ -159,6 +195,8 @@ function renderPanel(){
       if(d.output)html+=`${recipe(b.type)}<p class="note" id="input-status"></p><p class="production-output" id="production-output"></p><label class="limit-label">目标库存<select id="production-limit" aria-label="生产目标库存">${[...new Set([0,6,12,24,48,100,b.limit])].sort((a,b)=>a-b).map(n=>`<option value="${n}" ${b.limit===n?'selected':''}>${n===0?'不限制':n+' '+RESOURCE_NAMES[d.output!]}</option>`).join('')}</select></label><small class="note">达到目标后停产，库存降低后继续。0 表示不限制。</small>`;
       else html+=`<p class="production-output" id="production-output"></p>`;
       html+=`<div class="actions">${button('toggle-building','暂停生产')}${b.type==='workshop'?button('research','选择研究','primary'):button('building-economy','查看供需')}</div>`;
+    }else if(d.concept){
+      html+=`<p class="production-output">${BUILDING_ERAS.find(e=>e.id===d.era)!.name} · 概念模型</p><p class="note">来自后续时代的发展计划，目前只在测试模式中展示外观与动画，不参与经济结算。</p>`;
     }else if(b.type==='house'){
       html+=`<div class="stat-pair"><div><span>这座住宅提供</span><strong>3 <small>个名额</small></strong></div><div><span>聚落人口</span><strong id="house-population"></strong></div></div><div class="section-title">下一位居民 <span id="growth-percent"></span></div>${meter('growth-bar')}<p class="note" id="growth-reason"></p>${button('growth','暂停接纳新居民','secondary full')}`;
     }else if(b.type==='well'){
@@ -166,7 +204,7 @@ function renderPanel(){
     }else if(b.type==='granary'){
       html+=`<div class="section-title">食物储备 <span id="food-reserve"></span></div>${meter('food-storage-bar')}<p class="note" id="food-buffer"></p>${button('building-economy','查看食物收支','secondary full')}`;
     }else html+=`<p class="note" id="reserved"></p>${button('economy','查看资源收支','primary full')}`;
-    html+=`<div class="panel-bottom">${button('focus',`${icon('globe',15)} 定位建筑`,'quiet')}${button('overview','返回聚落','quiet')}</div>`;
+    html+=`<div class="panel-bottom">${button('inspect',`${icon('camera',15)} 近景查看`,'quiet')}${button('focus',`${icon('globe',15)} 定位`,'quiet')}${button('overview','返回聚落','quiet')}</div>${SANDBOX&&!b.initial?button('remove-building','移除这座建筑','danger full'):''}`;
   }else if(panel==='research'){
     setText('panel-kicker','DISCOVER · 科技');html=heading('让日子更从容','新的能力，需要研究，也需要真正的生产。');
     const eraIndex=sim.era==='industrial'?2:sim.era==='farming'?1:0;
@@ -197,26 +235,29 @@ function updateUI(force=false){
   const industry=sim.technologies.includes('metallurgy')||INDUSTRY_RESOURCES.some(r=>sim.resources[r]>0);$('industry-stock').hidden=!industry;$('interface').classList.toggle('has-industry',industry);
   const rates=sim.potentialRates;
   for(const r of RESOURCE_KEYS){setText(`stock-${r}`,amount(sim.resources[r]));setText(`rate-${r}`,sim.paused?'暂停':`${rate(rates[r])}/分`);$(`rate-${r}`)?.classList.toggle('negative',rates[r]<0);}
-  setText('population',`${sim.population} / ${sim.capacity}`);setText('stage',sim.stage);
-  if(lastChapter!==sim.chapter){lastChapter=sim.chapter;setText('chapter-number',String(Math.min(sim.chapter+1,4)).padStart(2,'0'));$('chapter-title').innerHTML=sim.currentChapter.title.split('\n').join('<br>');setText('chapter-description',sim.currentChapter.description);}
-  $('food-alert').hidden=!(sim.hungry||sim.foodBalance<0);setText('food-warning',sim.hungry?'口粮不足，材料生产与施工效率降低。':`食物产能不足 ${Math.abs(sim.foodBalance).toFixed(1)}/分，需要增加食物岗位。`);
+  setText('population',SANDBOX?`${sim.population} 人`:`${sim.population} / ${sim.capacity}`);setText('stage',sim.stage);
+  if(!SANDBOX&&lastChapter!==sim.chapter){lastChapter=sim.chapter;setText('chapter-number',String(Math.min(sim.chapter+1,4)).padStart(2,'0'));$('chapter-title').innerHTML=sim.currentChapter.title.split('\n').join('<br>');setText('chapter-description',sim.currentChapter.description);}
+  $('food-alert').hidden=SANDBOX||!(sim.hungry||sim.foodBalance<0);setText('food-warning',sim.hungry?'口粮不足，材料生产与施工效率降低。':`食物产能不足 ${Math.abs(sim.foodBalance).toFixed(1)}/分，需要增加食物岗位。`);
+  if(SANDBOX)updateSandbox();else{
   const goals=sim.goals,index=goals.findIndex(g=>!g.done);
   goals.forEach((g,i)=>{$(`goal-${i}`).classList.toggle('complete',g.done);$(`goal-${i}`).classList.toggle('current',i===index);setText(`goal-mark-${i}`,g.done?'✓':`0${i+1}`);setText(`goal-title-${i}`,g.title);setText(`goal-detail-${i}`,g.detail);});
   setText('goal-action',sim.finished?'查看产业收支 →':index<0?`完成「${sim.currentChapter.name}」 →`:`${goals[index].title} →`);
   setText('goal-foot',sim.finished?'四个篇章已完成，继续优化你的聚落。':`本章 ${goals.filter(g=>g.done).length} / 3 · 成果：${sim.currentChapter.rewardText}`);
-  setText('scene-label',scene.preview?'选址中 · 点击圆点，确认后建造':sim.paused?'聚落已暂停 · 可以继续查看与规划':`星球 01 · ${sim.currentChapter.name}`);
+  }
+  setText('scene-label',SANDBOX?(scene.preview?'测试模式 · 点击圆点选址，确认后立即建成':'测试模式 · 全部建筑免费、立即建成'):scene.preview?'选址中 · 点击圆点，确认后建造':sim.paused?'聚落已暂停 · 可以继续查看与规划':`星球 01 · ${sim.currentChapter.name}`);
   setText('navigation-hint',scene.preview?'点击地面选址 · R 旋转 · Esc 取消 · 拖动转动星球':'拖动转动星球 · 滚轮 / 双指缩放 · 点击建筑或资源管理');
   const pause=$('pause');if(pause.getAttribute('aria-pressed')!==String(sim.paused)){pause.setAttribute('aria-pressed',String(sim.paused));pause.innerHTML=icon(sim.paused?'play':'pause',16);pause.setAttribute('aria-label',sim.paused?'继续游戏':'暂停游戏');}
   document.querySelectorAll<HTMLButtonElement>('[data-speed]').forEach(el=>el.setAttribute('aria-pressed',String(Number(el.dataset.speed)===sim.speed)));
   for(const mode of ['overview','catalog','research'])$(`nav-${mode}`).classList.toggle('active',!$('management').hidden&&(panel===mode||mode==='catalog'&&panel==='placement'||mode==='overview'&&(panel==='building'||panel==='economy')));
   const weather=scene.weather.state;setText('weather-label',`${weather.mode==='auto'?'自动 · ':''}${weather.label}`);document.querySelectorAll('[data-weather]').forEach(el=>el.setAttribute('aria-pressed',String((el as HTMLElement).dataset.weather===weather.mode)));
-  setText('idle-count',`${sim.idle} 人`);setText('housing-count',`${sim.population} / ${sim.capacity}`);setText('house-population',`${sim.population} / ${sim.capacity}`);
+  setText('idle-count',`${sim.idle} 人`);setText('housing-count',SANDBOX?`${sim.capacity} 个`:`${sim.population} / ${sim.capacity}`);setText('house-population',`${sim.population} / ${sim.capacity}`);
   setText('builders-count',`${sim.buildersWanted}`);setText('builder-actual',`实际 ${sim.builders} 人`);document.querySelector('[data-action="builders-minus"]')?.toggleAttribute('disabled',sim.buildersWanted===0);document.querySelector('[data-action="builders-plus"]')?.toggleAttribute('disabled',sim.buildersWanted===4);
   setText('growth-percent',`${Math.floor(sim.growthProgress/GROWTH_SECONDS*100)}%`);progress('growth-bar',sim.growthProgress/GROWTH_SECONDS*100);setText('growth-reason',sim.growthReason);setText('facility-count',`${sim.buildings.length} 座`);
   setText('food-reserve',`${amount(sim.resources.food)} / ${sim.foodCapacity}`);setText('food-buffer',`停产后可支撑约 ${sim.foodMinutes.toFixed(1)} 游戏分钟 · 产能余量 ${rate(sim.foodBalance)}/分`);progress('food-storage-bar',sim.resources.food/sim.foodCapacity*100);
   for(const b of sim.buildings)setText(`facility-${b.id}`,sim.status(b));
   const reserved=sim.reserved;setText('reserved',RESOURCE_KEYS.some(r=>reserved[r]>0)?`仍在预留：${stockText(reserved)}。取消返还未使用部分。`:'资源由全星球共享，当前没有预留材料。');
-  if(panel==='catalog')for(const type of BUILDABLE){const d=BUILDINGS[type],locked=sim.buildingUnlockError(type);disable(`build-${type}`,!!locked);setText(`build-state-${type}`,locked?`需${TECHNOLOGIES[d.technology!].name}`:RESOURCE_KEYS.some(r=>sim.resources[r]<d.cost[r])?'材料不足':'选址 ↗');}
+  if(panel==='catalog'&&SANDBOX)for(const type of SANDBOX_BUILDABLE){const n=sim.buildings.filter(b=>b.type===type).length;setText(`build-state-${type}`,n?`已有 ${n} 座`:'选址 ↗');}
+  else if(panel==='catalog')for(const type of BUILDABLE){const d=BUILDINGS[type],locked=sim.buildingUnlockError(type);disable(`build-${type}`,!!locked);setText(`build-state-${type}`,locked?`需${TECHNOLOGIES[d.technology!].name}`:RESOURCE_KEYS.some(r=>sim.resources[r]<d.cost[r])?'材料不足':'选址 ↗');}
   if(panel==='placement'&&scene.preview){
     scene.updatePreview();const p=scene.preview;setText('placement-status',p.error||'位置合适，可以建造');$('placement-status').classList.toggle('invalid',!!p.error);setText('placement-region',p.siteId?SITE_BY_ID.get(p.siteId)!.region:'未选地块');setText('placement-yaw',`${Math.round(p.yaw/Math.PI*180)}°`);disable('confirm-build',!!p.error);
     setText('placement-benefit',p.siteId?(p.type==='well'?`范围内有 ${sim.farmsCovered(p.siteId).length} 座已建农田；产量 +25%，同田不叠加。`:p.type==='farm'?(sim.irrigatedAt(p.siteId)?'此处已有灌溉覆盖 · 农田产量 +25%':'此处未被水井覆盖，可之后安排灌溉。'):''):'');
@@ -248,6 +289,22 @@ function updateUI(force=false){
   const event=sim.events.at(-1);if(event&&event.id!==lastEvent){lastEvent=event.id;setText('activity-text',event.text);toast(event.text);save();}if(performance.now()-lastSave>10000)save();
 }
 
+function updateSandbox(){
+  for(const e of BUILDING_ERAS){const p=eraProgress(sim,e.id),done=p.placed===p.total;setText(`era-progress-${e.id}`,`${p.placed} / ${p.total} 种已建成`);setText(`era-build-${e.id}`,done?'已齐全':'建造');disable(`era-build-${e.id}`,done);$(`era-row-${e.id}`)?.classList.toggle('complete',done);}
+}
+/** Centre of an era's facilities on the test planet, or its district anchor before anything is built. */
+function eraCenter(era:BuildingEra):Direction{
+  const placed=sim.buildings.filter(b=>BUILDINGS[b.type].era===era).map(b=>directionVector(SITE_BY_ID.get(b.siteId)!.direction));
+  if(!placed.length)return ERA_DISTRICTS[era];
+  return placed.reduce((sum,n)=>sum.add(n)).normalize().toArray() as Direction;
+}
+function buildSandboxEra(era:BuildingEra){
+  if(scene.preview)scene.cancelBuild();
+  const report=buildEra(sim,era),name=BUILDING_ERAS.find(e=>e.id===era)!.name;
+  scene.focusDirection(eraCenter(era));scene.selectBuilding(null);
+  toast(report.built.length?`${name}：已建成 ${report.built.length} 座${report.skipped.length?`，${report.skipped.length} 座没有找到空地`:''}`:`${name}的建筑都已建成`);
+  save();updateUI(true);
+}
 function goView(view:ViewName){if(scene.preview)scene.cancelBuild();scene.setView(view);openPanel('overview');}
 function selectBuilding(id:string,focus=true){if(scene.preview)scene.cancelBuild();if(focus)scene.focusBuilding(id);else scene.selectBuilding(id);showPanel('building');}
 function openEconomy(resource:Resource='food'){selectedResource=resource;openPanel('economy');}
@@ -316,6 +373,12 @@ function handleAction(action:string){
     case 'growth':sim.growthEnabled=!sim.growthEnabled;break;
     case 'cancel-construction':if(b){act(sim.cancelConstruction(b.id));scene.selectBuilding(null);showPanel('overview');}break;
     case 'focus':if(b)scene.focusBuilding(b.id);break;
+    case 'inspect':if(b)scene.inspectBuilding(b.id);break;
+    case 'remove-building':if(b){const result=sim.removeBuilding(b.id);if(result.ok){scene.selectBuilding(null);showPanel('overview');}else toast(result.reason);}break;
+    case 'sandbox-all':{if(scene.preview)scene.cancelBuild();$<HTMLDialogElement>('help-dialog').close();const report=buildAllEras(sim);scene.setView('planet');toast(report.built.length?`已建成 ${report.built.length} 座建筑${report.skipped.length?`，${report.skipped.length} 座没有找到空地`:''}；拖动星球查看各个时代`:'全部建筑都已在星球上');break;}
+    case 'sandbox-clear':{if(scene.preview)scene.cancelBuild();$<HTMLDialogElement>('help-dialog').close();const removed=clearSandbox(sim);scene.selectBuilding(null);showPanel('overview');toast(removed?`已移除 ${removed} 座测试建筑`:'没有可以移除的测试建筑');break;}
+    case 'sandbox-exit':save();restarting=true;location.href=modeURL(false);return;
+    case 'enter-test':save();restarting=true;location.href=modeURL(true);return;
     case 'rotate':scene.rotatePreview();break;
     case 'next-site':scene.nextBuildSite();break;
     case 'confirm-build':act(scene.confirmBuild());break;
@@ -328,7 +391,7 @@ function handleAction(action:string){
     case 'photo':void scene.capture().then(()=>toast('已保存当前星球视角'));break;
     case 'auto-rotate':scene.autoRotate=!scene.autoRotate;toast(scene.autoRotate?'星球开始缓缓转动':'已停止自转');break;
     case 'wind':scene.wind=!scene.wind;toast(scene.wind?'树冠微风已开启':'树冠微风已关闭');break;
-    case 'help':try{$('restore-save').hidden=!GameSimulation.load(JSON.parse(localStorage.getItem(STORAGE+'-before-import')||'null'));}catch{$('restore-save').hidden=true;}setText('help-save',storageFailed?'浏览器未允许保存，请保留当前页面。':'聚落已自动保存到当前浏览器。');$<HTMLDialogElement>('help-dialog').showModal();break;
+    case 'help':{const restore=$('restore-save');if(restore)try{restore.hidden=!GameSimulation.load(JSON.parse(localStorage.getItem(STORAGE+'-before-import')||'null'));}catch{restore.hidden=true;}}setText('help-save',storageFailed?'浏览器未允许保存，请保留当前页面。':'聚落已自动保存到当前浏览器。');$<HTMLDialogElement>('help-dialog').showModal();break;
     case 'close-help':$<HTMLDialogElement>('help-dialog').close();break;
     case 'reset-request':$<HTMLDialogElement>('help-dialog').close();$<HTMLDialogElement>('reset-dialog').showModal();break;
     case 'reset-cancel':$<HTMLDialogElement>('reset-dialog').close();break;
@@ -349,6 +412,8 @@ requestAnimationFrame(()=>setTimeout(()=>{
       else if(target.dataset.build)build(target.dataset.build as BuildingType);
       else if(target.dataset.building)selectBuilding(target.dataset.building);
       else if(target.dataset.resource)openEconomy(target.dataset.resource as Resource);
+      else if(target.dataset.eraBuild)buildSandboxEra(target.dataset.eraBuild as BuildingEra);
+      else if(target.dataset.eraFocus){if(scene.preview)scene.cancelBuild();scene.focusDirection(eraCenter(target.dataset.eraFocus as BuildingEra));scene.selectBuilding(null);}
       else if(target.dataset.guideBuilding)guideBuilding(target.dataset.guideBuilding as BuildingType,false);
       else if(target.dataset.guideResearch)guideResearch(target.dataset.guideResearch as TechId);
       else if(target.dataset.category){catalogCategory=target.dataset.category;showPanel('catalog');}
@@ -370,6 +435,7 @@ requestAnimationFrame(()=>setTimeout(()=>{
     window.addEventListener('pagehide',save);document.addEventListener('visibilitychange',()=>{if(document.hidden)save();});
     Object.assign(window,{__PLANET_GAME__:{scene,simulation:sim,ready:true},__WOODLAND__:{scene,simulation:sim,ready:true}});
     $('loading').classList.add('loaded');setTimeout(()=>$('loading').remove(),600);updateUI(true);
-    if(restored)toast('欢迎回来，聚落进度已恢复');else if(invalidSave)toast('旧存档无法读取，已保留副本并开启新聚落');
+    if(SANDBOX)toast(restored?'已恢复测试星球':'测试模式：点击「一键建造全部时代」查看所有建筑');
+    else if(restored)toast('欢迎回来，聚落进度已恢复');else if(invalidSave)toast('旧存档无法读取，已保留副本并开启新聚落');
   }catch(error){console.error(error);$('loading').innerHTML=`${icon('tree',40)}<h2>暂时无法打开三维场景</h2><p>请使用支持 WebGL 2 的浏览器，并开启硬件加速。</p><button class="primary" id="retry">重新加载</button>`;$('retry').addEventListener('click',()=>location.reload());}
 },60));

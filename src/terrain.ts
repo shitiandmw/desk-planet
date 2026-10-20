@@ -3,6 +3,7 @@ import { canvasTexture, mesh, rng, vec } from './craft';
 import { elevation, landField, planetGeometry, surfacePoint } from './planet-surface';
 import { Ocean } from './ocean';
 import { cloudShadowGLSL, type CloudShadowUniform } from './cloud-shadows';
+import { bakePlanetField, planetFieldSampleGLSL } from './planet-field-texture';
 
 export const paths = [
   new THREE.CatmullRomCurve3([vec(.8, 0, 5.4), vec(.2, 0, 3.9), vec(.35, 0, 2.7), vec(-.05, 0, 1.35), vec(.6, 0, -.15), vec(.7, 0, -1.8), vec(.95, 0, -4.9)]),
@@ -15,25 +16,35 @@ export function pathDistance(x: number, z: number) { let min = 100; for (const p
 export function facilityDistance(x: number, z: number) { return Math.min(Math.hypot((x - 1.7) * .8, (z - 2.5) * .95) - 1.1, Math.hypot(x + 3.2, z - 2) - 1.05, Math.hypot(x + 1, z - 2.1) - .8); }
 
 export function makeTerrain(parent: THREE.Object3D, renderer: THREE.WebGLRenderer, cloudShadows: CloudShadowUniform) {
-  const geometry = planetGeometry(), position = geometry.attributes.position;
+  // Twice the former resolution keeps the geometric coastline close to the per-pixel shoreline below.
+  const geometry = planetGeometry(512, 256), position = geometry.attributes.position;
   const colors: number[] = [], n = new THREE.Vector3();
-  const grass = new THREE.Color('#78984d'), lightGrass = new THREE.Color('#9ba859'), sand = new THREE.Color('#cabe94'), rock = new THREE.Color('#969e8e');
+  const grass = new THREE.Color('#78984d'), lightGrass = new THREE.Color('#9ba859'), rock = new THREE.Color('#969e8e');
   for (let i = 0; i < position.count; i++) {
     n.fromBufferAttribute(position, i).normalize();
     const h = elevation(n), field = landField(n);
     const variation = .5 + .3 * Math.sin(n.x * 38 + n.z * 24) * Math.cos(n.y * 28);
     const c = grass.clone().lerp(lightGrass, variation);
-    c.lerp(sand, 1 - THREE.MathUtils.smoothstep(field, .005, .052));
+    // Darker, lusher grass where the land is moist near forests and low ground; beaches are shaded per pixel.
+    c.multiplyScalar(.97 + .05 * THREE.MathUtils.smoothstep(field, .05, .35));
     c.lerp(rock, THREE.MathUtils.smoothstep(h, .3, .6));
     c.multiplyScalar(.96 + .04 * Math.sin(n.z * 140 + n.x * 89)); colors.push(c.r, c.g, c.b);
   }
   geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
   const textureRandom = rng(445);
-  const grassTexture = canvasTexture(256, (ctx, size) => {
-    ctx.fillStyle = '#ebeada'; ctx.fillRect(0, 0, size, size);
+  const grassTexture = canvasTexture(512, (ctx, size) => {
+    const s = size / 2; ctx.save(); ctx.scale(2, 2);
+    ctx.fillStyle = '#ebeada'; ctx.fillRect(0, 0, s, s);
     for (let i = 0; i < 13000; i++) {
       ctx.fillStyle = textureRandom() > .5 ? 'rgba(95,108,66,.13)' : 'rgba(255,255,237,.19)';
-      ctx.fillRect(textureRandom() * size, textureRandom() * size, 1 + textureRandom() * 2, 1 + textureRandom() * 3);
+      ctx.fillRect(textureRandom() * s, textureRandom() * s, 1 + textureRandom() * 2, 1 + textureRandom() * 3);
+    }
+    ctx.restore();
+    // Fine, evenly balanced blades at full resolution: texture in close-ups, the same average tone from afar.
+    for (let i = 0; i < 14000; i++) {
+      const x = textureRandom() * size, y = textureRandom() * size, lean = (textureRandom() - .5) * .9, length = 2 + textureRandom() * 4;
+      ctx.strokeStyle = i % 2 ? 'rgba(78,94,50,.17)' : 'rgba(255,255,235,.17)'; ctx.lineWidth = .8;
+      ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + Math.sin(lean) * length, y - Math.cos(lean) * length); ctx.stroke();
     }
   });
   grassTexture.repeat.set(24, 12);
@@ -41,21 +52,40 @@ export function makeTerrain(parent: THREE.Object3D, renderer: THREE.WebGLRendere
   terrain.name = 'closed-planet-terrain';
 
   const groundMaterial = terrain.material as THREE.MeshStandardMaterial;
+  const bakedField = bakePlanetField(renderer);
+  const groundUniforms = { uSand: { value: new THREE.Color('#e4d6a6') }, uWetSand: { value: new THREE.Color('#c6b484') }, uPlanetField: { value: bakedField.texture } };
   groundMaterial.onBeforeCompile = shader => {
-    shader.uniforms.uCloudShadows = cloudShadows;
+    Object.assign(shader.uniforms, groundUniforms, { uCloudShadows: cloudShadows });
     shader.vertexShader = 'varying vec3 vGroundDirection;\n' + shader.vertexShader;
     shader.vertexShader = shader.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\nvGroundDirection = normalize(position);');
-    shader.fragmentShader = 'varying vec3 vGroundDirection;\n' + cloudShadowGLSL + shader.fragmentShader;
-    shader.fragmentShader = shader.fragmentShader.replace('#include <color_fragment>', '#include <color_fragment>\ndiffuseColor.rgb *= cloudShade(normalize(vGroundDirection));');
+    shader.fragmentShader = 'varying vec3 vGroundDirection;\nuniform vec3 uSand; uniform vec3 uWetSand;\n' + cloudShadowGLSL + planetFieldSampleGLSL + shader.fragmentShader;
+    shader.fragmentShader = shader.fragmentShader.replace('#include <color_fragment>', `#include <color_fragment>
+      vec3 groundDir = normalize(vGroundDirection);
+      vec4 baked = planetFieldSample(groundDir);
+      float groundField = planetFieldValue(baked), meadow = baked.b;
+      // Broad sun-dried patches and fine mottling keep large meadows from reading as flat colour.
+      diffuseColor.rgb *= .93 + .14 * meadow;
+      diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(1.07, 1.05, .84), baked.a * .5);
+      // Sand follows the coastline per pixel; the waterline darkens like wet sand.
+      float beach = 1. - smoothstep(.01, .05, groundField + (meadow - .5) * .014);
+      float wet = 1. - smoothstep(-.004, .016, groundField);
+      diffuseColor.rgb = mix(diffuseColor.rgb, mix(uSand, uWetSand, wet) * (.95 + .1 * meadow), beach);
+      diffuseColor.rgb *= cloudShade(groundDir);`);
   };
-  groundMaterial.customProgramCacheKey = () => 'planet-cloud-shadows-v1';
-  const oceanSurface = new Ocean(renderer, cloudShadows);
+  groundMaterial.customProgramCacheKey = () => 'planet-ground-baked-v3';
+  const oceanSurface = new Ocean(renderer, cloudShadows, bakedField.texture);
   const ocean = oceanSurface.mesh; parent.add(ocean);
 
   const random = rng(245);
-  const dirtMap = canvasTexture(256, (ctx, size) => {
-    ctx.fillStyle = '#c8b486'; ctx.fillRect(0, 0, size, size);
-    for (let i = 0; i < 11000; i++) { ctx.globalAlpha = .1 + random() * .12; ctx.fillStyle = random() > .5 ? '#7b704b' : '#eee0ae'; ctx.fillRect(random() * size, random() * size, 1 + random() * 2, 1 + random() * 2); }
+  const dirtMap = canvasTexture(512, (ctx, size) => {
+    const s = size / 2; ctx.scale(2, 2);
+    ctx.fillStyle = '#c8b486'; ctx.fillRect(0, 0, s, s);
+    for (let i = 0; i < 11000; i++) { ctx.globalAlpha = .1 + random() * .12; ctx.fillStyle = random() > .5 ? '#7b704b' : '#eee0ae'; ctx.fillRect(random() * s, random() * s, 1 + random() * 2, 1 + random() * 2); }
+    // Grit and small pebbles at full resolution.
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    for (let i = 0; i < 9000; i++) { ctx.globalAlpha = .12 + random() * .14; ctx.fillStyle = i % 2 ? '#6f6444' : '#f4e8bd'; ctx.fillRect(random() * size, random() * size, 1, 1); }
+    for (let i = 0; i < 160; i++) { const x = random() * size, y = random() * size, r = 1.2 + random() * 2.2; ctx.globalAlpha = .35; ctx.fillStyle = '#e9dcb4'; ctx.beginPath(); ctx.ellipse(x, y, r, r * .75, random() * 3, 0, Math.PI * 2); ctx.fill(); ctx.globalAlpha = .22; ctx.fillStyle = '#5f553a'; ctx.fillRect(x - r * .8, y + r * .55, r * 1.6, .8); }
+    ctx.globalAlpha = 1;
   });
   const dirt = new THREE.MeshStandardMaterial({ map: dirtMap, roughness: 1, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 });
   for (const path of paths) {

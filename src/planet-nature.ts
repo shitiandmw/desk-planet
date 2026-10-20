@@ -1,46 +1,68 @@
 import * as THREE from 'three';
-import { mesh, rng, standard, vec } from './craft';
+import { mesh, rng, vec } from './craft';
+import { boulderGeometry, rockMaterial } from './building-kit';
 import { elevation, landField, NORTH, PLANET_RADIUS } from './planet-surface';
-import { makeTree, type Tree } from './trees';
+import { bakeTree, bark, canopyCore, makePinePrototype, makeTree } from './trees';
 import { BACKGROUND_TREES } from './world-layout';
+import type { SceneryClearance } from './scenery';
 
-export function makePlanetNature(parent: THREE.Object3D): Tree[] {
-  const random = rng(862), trees: Tree[] = [];
-  // Sparse grouped woods on the rest of the globe. The original settlement is unique.
-  for (const location of BACKGROUND_TREES) {
-    const n = vec(...location.normal);
-    const tree = makeTree(location.seed, -1, true);
-    tree.root.position.copy(n).multiplyScalar(PLANET_RADIUS + elevation(n));
-    tree.root.quaternion.setFromUnitVectors(NORTH, n); tree.root.rotateY(random() * Math.PI * 2);
-    tree.root.scale.setScalar(.14 + random() * .1);
-    parent.add(tree.root); trees.push(tree);
-  }
+const UPLAND_PINES = 42;
 
-  const rockMat = standard('#a1a598');
-  const rockGeometry = new THREE.IcosahedronGeometry(1, 1);
-  const positions = rockGeometry.attributes.position;
-  for (let i = 0; i < positions.count; i++) {
-    const x = positions.getX(i), y = positions.getY(i), z = positions.getZ(i);
-    const variation = 1 + .13 * Math.sin(x * 9 + z * 7) * Math.cos(y * 8);
-    positions.setXYZ(i, x * variation, y * variation, z * variation);
+/**
+ * Background woods, upland conifers, boulders and the atmospheric rim. Trees are a handful of baked prototypes
+ * instanced across the globe, so the whole background costs a few draw calls. Returns the number of trees.
+ */
+export function makePlanetNature(parent: THREE.Object3D, scenery: SceneryClearance) {
+  const random = rng(862), dummy = new THREE.Object3D();
+  const prototypes = [...[0, 1, 2].map(k => bakeTree(makeTree(300 + k * 17, -1, true))), makePinePrototype(411), makePinePrototype(433)];
+  const placements: { n: THREE.Vector3; kind: number; scale: number }[] = [];
+  // The gameplay woods keep their exact spots and broadleaf look (lumber rules read BACKGROUND_TREES).
+  for (const location of BACKGROUND_TREES) placements.push({ n: vec(...location.normal), kind: location.seed % 3, scale: .14 + random() * .1 });
+  // Conifers climb the mountain flanks. They are scenery only: a facility built among them clears its footprint.
+  for (let i = 0, pines = 0; i < 3200 && pines < UPLAND_PINES; i++) {
+    const y = 1 - 2 * (i + .5) / 3200, a = i * 2.399963, r = Math.sqrt(1 - y * y);
+    const n = vec(Math.cos(a) * r, y, Math.sin(a) * r), h = elevation(n);
+    if (landField(n) < .06 || h < .2 || h > .66 || random() > .7) continue;
+    if (placements.some(p => p.n.distanceTo(n) * PLANET_RADIUS < .42)) continue;
+    placements.push({ n, kind: 3 + (i % 2), scale: .12 + random() * .08 }); pines++;
   }
-  rockGeometry.computeVertexNormals();
-  const rock = new THREE.InstancedMesh(rockGeometry, rockMat, 150), dummy = new THREE.Object3D();
-  let count = 0;
-  for (let i = 0; i < 1600 && count < 150; i++) {
+  const warm = new THREE.Color('#f4dc9c');
+  prototypes.forEach((proto, kind) => {
+    const list = placements.filter(p => p.kind === kind); if (!list.length) return;
+    const parts = [new THREE.InstancedMesh(proto.trunk, bark, list.length), new THREE.InstancedMesh(proto.leaves, proto.leafMaterial, list.length)];
+    if (proto.core) parts.push(new THREE.InstancedMesh(proto.core, canopyCore, list.length));
+    list.forEach((p, i) => {
+      dummy.position.copy(p.n).multiplyScalar(PLANET_RADIUS + elevation(p.n) - .015);
+      dummy.quaternion.setFromUnitVectors(NORTH, p.n); dummy.rotateY(random() * Math.PI * 2); dummy.scale.setScalar(p.scale); dummy.updateMatrix();
+      // Gentle variation between trees; about one broadleaf in eight turns a warmer gold.
+      const tint = new THREE.Color(1, 1, 1).multiplyScalar(.9 + random() * .18); if (kind < 3 && random() < .12) tint.multiply(warm);
+      parts.forEach((m, j) => { m.setMatrixAt(i, dummy.matrix); if (j) m.setColorAt(i, tint); });
+    });
+    for (const m of parts) { m.castShadow = m.receiveShadow = true; m.name = 'background-trees'; parent.add(m); }
+    if (kind >= 3) for (const m of parts) scenery.register(m, 1.3);
+  });
+
+  // Weathered boulders on the coasts and mountain flanks: three shapes, mossy tops, sunk into the slope.
+  const shapes = [boulderGeometry(901, 2, .9), boulderGeometry(917, 2, .55), boulderGeometry(933, 2, 1)];
+  const rocks = shapes.map(g => new THREE.InstancedMesh(g, rockMaterial, 60)), counts = [0, 0, 0];
+  const stone = ['#b5af9f', '#a9ab9f', '#bdb5a2', '#a3a598'].map(c => new THREE.Color(c));
+  for (let i = 0, count = 0; i < 1600 && count < 150; i++) {
     const index = (i * 557) % 1600;
     const y = 1 - 2 * (index + .5) / 1600, a = index * 2.399963;
     const n = vec(Math.cos(a) * Math.sqrt(1 - y * y), y, Math.sin(a) * Math.sqrt(1 - y * y));
-    const h = elevation(n), field = landField(n);
-    if (field < .001 || (field > .06 && h < .3) || n.y > .96) continue;
-    if (h < .3 && random() > .28) continue;
-    const size = h > .3 ? .23 + random() * .4 : .07 + random() * .13;
-    dummy.position.copy(n).multiplyScalar(PLANET_RADIUS + h - size * .18);
+    const h = elevation(n), field = landField(n), upland = h > .3;
+    if (field < .001 || (field > .06 && !upland) || n.y > .96) continue;
+    if (!upland && random() > .28) continue;
+    if (placements.some(p => p.n.distanceTo(n) * PLANET_RADIUS < .32)) continue;
+    const size = upland ? .2 + random() * .34 : .07 + random() * .13;
+    dummy.position.copy(n).multiplyScalar(PLANET_RADIUS + h - size * (upland ? .35 : .15));
     dummy.quaternion.setFromUnitVectors(NORTH, n); dummy.rotateY(random() * 7);
-    dummy.scale.set(size * (1 + random() * .4), size * (h > .3 ? 1.8 : .8), size);
-    dummy.updateMatrix(); rock.setMatrixAt(count++, dummy.matrix);
+    dummy.scale.set(size * (1 + random() * .4), size * (upland ? 1.5 : .8), size);
+    dummy.updateMatrix();
+    const k = count++ % 3; rocks[k].setMatrixAt(counts[k], dummy.matrix);
+    rocks[k].setColorAt(counts[k]++, stone[Math.floor(random() * stone.length)].clone().multiplyScalar(.9 + random() * .14));
   }
-  rock.count = count; rock.castShadow = rock.receiveShadow = true; parent.add(rock);
+  rocks.forEach((m, k) => { m.count = counts[k]; m.castShadow = m.receiveShadow = true; m.name = 'boulders'; parent.add(m); scenery.register(m); });
 
   // A thin atmospheric rim reinforces the round silhouette without obscuring the land.
   const atmosphere = new THREE.ShaderMaterial({
@@ -50,5 +72,5 @@ export function makePlanetNature(parent: THREE.Object3D): Tree[] {
     transparent: true, side: THREE.BackSide, depthWrite: false,
   });
   const rim = mesh(new THREE.SphereGeometry(PLANET_RADIUS + .095, 96, 48), atmosphere, parent); rim.castShadow = rim.receiveShadow = false;
-  return trees;
+  return placements.length;
 }

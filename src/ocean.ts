@@ -1,7 +1,9 @@
 import * as THREE from 'three';
 import { canvasTexture } from './craft';
 import { cloudShadowGLSL, type CloudShadowUniform } from './cloud-shadows';
-import { elevation, PLANET_RADIUS } from './planet-surface';
+import { PLANET_RADIUS } from './planet-surface';
+import { planetNoiseGLSL } from './planet-glsl';
+import { planetFieldSampleGLSL } from './planet-field-texture';
 
 const waveGLSL = `
 uniform float uOceanTime;
@@ -24,36 +26,40 @@ vec3 oceanGradient(vec3 p) {
 `;
 const oceanVaryings = `
 varying vec3 vOceanPoint;
-varying float vWaterDepth;
 varying vec3 vOceanX;
 varying vec3 vOceanY;
 varying vec3 vOceanZ;
 `;
 
-/** A closed dielectric water shell with world-space swells, sky reflection, shoals and moving foam. */
+/**
+ * A closed dielectric water shell. Depth comes from the baked terrain field per pixel, so the shoreline, the sandy
+ * shallows, caustics and the foam line are smooth at any zoom instead of following mesh triangles. Caustics and surf
+ * are only evaluated in the shallow band where they can be seen.
+ */
 export class Ocean {
   mesh: THREE.Mesh<THREE.SphereGeometry, THREE.MeshPhysicalMaterial>;
   uniforms = {
     uOceanTime: { value: 0 }, uRain: { value: 0 },
-    uDeepWater: { value: new THREE.Color('#12556f') },
-    uShallowWater: { value: new THREE.Color('#4bb2a3') },
-    uFoam: { value: new THREE.Color('#d8ebe0') },
+    uDeepWater: { value: new THREE.Color('#14609a') },
+    uMidWater: { value: new THREE.Color('#1f97bf') },
+    uShallowWater: { value: new THREE.Color('#41c3c2') },
+    uSeabed: { value: new THREE.Color('#e3d7aa') },
+    uFoam: { value: new THREE.Color('#f4f8f2') },
+    uPlanetField: { value: null as THREE.Texture | null },
   };
   private reflection: THREE.WebGLRenderTarget;
+  /** The embedded sky environment, shared with glass and metal on buildings. */
+  get environment() { return this.reflection.texture; }
 
-  constructor(renderer: THREE.WebGLRenderer, cloudShadows: CloudShadowUniform) {
+  constructor(renderer: THREE.WebGLRenderer, cloudShadows: CloudShadowUniform, field: THREE.Texture) {
+    this.uniforms.uPlanetField.value = field;
     const geometry = new THREE.SphereGeometry(PLANET_RADIUS, 256, 128);
-    const position = geometry.attributes.position, depths = new Float32Array(position.count), normal = new THREE.Vector3();
-    for (let i = 0; i < position.count; i++) {
-      normal.fromBufferAttribute(position, i).normalize(); depths[i] = Math.max(0, -elevation(normal));
-    }
-    geometry.setAttribute('aWaterDepth', new THREE.BufferAttribute(depths, 1));
 
     // An embedded sky environment gives dielectric reflections without external HDR downloads.
     const sky = canvasTexture(512, (ctx, size) => {
       const gradient = ctx.createLinearGradient(0, 0, 0, size);
-      gradient.addColorStop(0, '#9dbed6'); gradient.addColorStop(.32, '#bdd4df');
-      gradient.addColorStop(.49, '#f1eee0'); gradient.addColorStop(.53, '#c3cec3'); gradient.addColorStop(1, '#5b787d');
+      gradient.addColorStop(0, '#8fb9da'); gradient.addColorStop(.32, '#b9d4e3');
+      gradient.addColorStop(.49, '#f3f0e2'); gradient.addColorStop(.53, '#c3d2cb'); gradient.addColorStop(1, '#4f7a86');
       ctx.fillStyle = gradient; ctx.fillRect(0, 0, size, size);
       for (const [x,y,w,h] of [[110,100,130,14],[370,160,150,18],[240,205,190,9]]) {
         const glow = ctx.createRadialGradient(x,y,0,x,y,w*.5); glow.addColorStop(0,'rgba(255,255,247,.8)');glow.addColorStop(1,'rgba(255,255,247,0)');
@@ -64,50 +70,68 @@ export class Ocean {
     const pmrem = new THREE.PMREMGenerator(renderer); this.reflection = pmrem.fromEquirectangular(sky); pmrem.dispose(); sky.dispose();
 
     const material = new THREE.MeshPhysicalMaterial({
-      color: '#ffffff', metalness: 0, roughness: .18, ior: 1.333,
+      color: '#ffffff', metalness: 0, roughness: .12, ior: 1.333,
       envMap: this.reflection.texture, envMapIntensity: 1.0,
-      clearcoat: .08, clearcoatRoughness: .3,
     });
     material.onBeforeCompile = shader => {
       Object.assign(shader.uniforms, this.uniforms, { uCloudShadows: cloudShadows });
-      shader.vertexShader = `attribute float aWaterDepth;\n${oceanVaryings}\n${waveGLSL}\n` + shader.vertexShader;
+      shader.vertexShader = `${oceanVaryings}\n${waveGLSL}\n${planetFieldSampleGLSL}\n` + shader.vertexShader;
       shader.vertexShader = shader.vertexShader.replace('#include <begin_vertex>', `
         #include <begin_vertex>
-        vOceanPoint = position; vWaterDepth = aWaterDepth;
+        vOceanPoint = position;
         vOceanX = normalMatrix * vec3(1.,0.,0.);
         vOceanY = normalMatrix * vec3(0.,1.,0.);
         vOceanZ = normalMatrix * vec3(0.,0.,1.);
-        transformed += normalize(position) * oceanHeight(position) * smoothstep(0.,.25,aWaterDepth);
+        float vertexDepth = planetSeaDepth(planetFieldSample(normalize(position)));
+        transformed += normalize(position) * oceanHeight(position) * smoothstep(0.,.25,vertexDepth);
       `);
-      shader.fragmentShader = `${oceanVaryings}\n${waveGLSL}\n${cloudShadowGLSL}\n
-        uniform vec3 uDeepWater; uniform vec3 uShallowWater; uniform vec3 uFoam;
-        float oceanHash(vec3 p) { p=fract(p*.3183099+vec3(.1,.3,.7));p*=17.;return fract(p.x*p.y*p.z*(p.x+p.y+p.z)); }
-        float oceanNoise(vec3 p) {
-          vec3 i=floor(p), f=fract(p); f=f*f*(3.-2.*f);
-          return mix(mix(mix(oceanHash(i),oceanHash(i+vec3(1,0,0)),f.x),mix(oceanHash(i+vec3(0,1,0)),oceanHash(i+vec3(1,1,0)),f.x),f.y),
-                     mix(mix(oceanHash(i+vec3(0,0,1)),oceanHash(i+vec3(1,0,1)),f.x),mix(oceanHash(i+vec3(0,1,1)),oceanHash(i+vec3(1,1,1)),f.x),f.y),f.z);
+      shader.fragmentShader = `${oceanVaryings}\n${waveGLSL}\n${cloudShadowGLSL}\n${planetFieldSampleGLSL}\n${planetNoiseGLSL}\n
+        uniform vec3 uDeepWater; uniform vec3 uMidWater; uniform vec3 uShallowWater; uniform vec3 uSeabed; uniform vec3 uFoam;
+        float oceanDepth;
+        // Two drifting noise layers meet in thin bright ridges: the familiar caustic web over a sandy bed.
+        float caustics(vec3 p) {
+          vec3 q = p * 7.5;
+          float a = planetNoise(q + vec3(uOceanTime * .32, 0., uOceanTime * .23));
+          float b = planetNoise(q * 1.63 - vec3(uOceanTime * .21, uOceanTime * .27, 0.));
+          return pow(clamp(1. - abs(a - b) * 2.6, 0., 1.), 6.);
         }
       ` + shader.fragmentShader;
       shader.fragmentShader = shader.fragmentShader.replace('#include <color_fragment>', `
         #include <color_fragment>
-        float shoal = exp(-vWaterDepth * 4.5);
-        float detail = oceanNoise(vOceanPoint * 6.0);
-        diffuseColor.rgb = mix(uDeepWater, uShallowWater, shoal);
-        diffuseColor.rgb *= .96 + .07 * detail;
-        float ripples = pow(.5+.5*sin(dot(vOceanPoint,swellA)*37.0+oceanNoise(vOceanPoint*7.0)*5.0-uOceanTime*2.2),12.0);
-        ripples *= smoothstep(.55,.85,oceanNoise(vOceanPoint*14.0)) * smoothstep(.02,.18,vWaterDepth);
-        diffuseColor.rgb = mix(diffuseColor.rgb,vec3(.28,.48,.51),ripples*(.025+uRain*.035));
-        float coast = 1.0-smoothstep(.02,.13,vWaterDepth);
-        float wash = .5+.5*sin(vWaterDepth*105.0-uOceanTime*1.5+detail*5.0);
-        float foam = smoothstep(.8,.99,wash)*coast*smoothstep(.25,.65,detail)*.42;
-        diffuseColor.rgb = mix(diffuseColor.rgb,uFoam,foam);
+        vec4 oceanField = planetFieldSample(normalize(vOceanPoint));
+        oceanDepth = planetSeaDepth(oceanField);
+        vec3 water = mix(uShallowWater, uMidWater, smoothstep(.02, .45, oceanDepth));
+        water = mix(water, uDeepWater, smoothstep(.3, 1.3, oceanDepth));
+        water *= .965 + .07 * oceanField.b;
+        float ripples = pow(.5 + .5 * sin(dot(vOceanPoint, swellA) * 37. + oceanField.b * 5. - uOceanTime * 2.2), 12.);
+        water = mix(water, water * vec3(.82, .92, .96), ripples * smoothstep(.45, .8, oceanField.a) * smoothstep(.04, .2, oceanDepth) * (.06 + uRain * .08));
+        if (oceanDepth < .5) {
+          // Beer-Lambert style clarity: the sandy bed shows through the shallows and caustics play across it.
+          float clarity = exp(-oceanDepth * 24.), light = caustics(vOceanPoint);
+          water = mix(water, uSeabed * (.9 + .32 * light), clarity * .82);
+          water += vec3(.10, .16, .14) * light * exp(-oceanDepth * 8.) * (1. - clarity * .6) * .6;
+        }
+        diffuseColor.rgb = water;
+        if (oceanDepth < .17) {
+          // Foam: a broken line just offshore plus wave fronts rolling in; the waterline itself stays sandy so
+          // the mesh intersection with the terrain is never outlined.
+          float breakup = planetNoise(vOceanPoint * 17. + uOceanTime * .18);
+          float line = smoothstep(.018, .034, oceanDepth) * (1. - smoothstep(.05, .075, oceanDepth));
+          float fronts = .5 + .5 * sin(oceanDepth * 115. + uOceanTime * 1.7 + breakup * 3.);
+          float rolling = smoothstep(.84, .97, fronts) * smoothstep(.03, .06, oceanDepth) * (1. - smoothstep(.09, .16, oceanDepth));
+          float foam = max(line * smoothstep(.25, .6, breakup + .2), rolling * smoothstep(.35, .7, breakup)) * (.88 + uRain * .1);
+          diffuseColor.rgb = mix(water, uFoam, foam);
+        }
       `);
       shader.fragmentShader = shader.fragmentShader.replace('#include <normal_fragment_begin>', `
         #include <normal_fragment_begin>
         vec3 radial = normalize(vOceanPoint);
         vec3 waveSlope = oceanGradient(vOceanPoint);
+        // Fine capillary ripples break the sun highlight into glints offshore.
+        vec3 q = vOceanPoint * 42. + vec3(uOceanTime * .6, 0., -uOceanTime * .5);
+        waveSlope += vec3(sin(dot(q, vec3(.83, .21, .52))), sin(dot(q, vec3(-.31, .78, .55)) + 1.7), sin(dot(q, vec3(.42, -.47, .78)) + 3.1)) * .022;
         waveSlope -= radial * dot(waveSlope,radial);
-        waveSlope *= smoothstep(0.,.22,vWaterDepth);
+        waveSlope *= smoothstep(0., .22, oceanDepth);
         normal = normalize(normal - (vOceanX*waveSlope.x+vOceanY*waveSlope.y+vOceanZ*waveSlope.z));
       `);
       shader.fragmentShader = shader.fragmentShader.replace('#include <lights_fragment_end>', `
@@ -117,15 +141,15 @@ export class Ocean {
         reflectedLight.directSpecular *= cloudShadow;
       `);
     };
-    material.customProgramCacheKey = () => 'planet-ocean-swell-v1';
+    material.customProgramCacheKey = () => 'planet-ocean-baked-v3';
     this.mesh = new THREE.Mesh(geometry, material); this.mesh.name = 'continuous-ocean-sphere';
     this.mesh.castShadow = this.mesh.receiveShadow = false;
   }
 
   update(time: number, rain: number, cloudiness: number) {
     this.uniforms.uOceanTime.value = time; this.uniforms.uRain.value = rain;
-    this.mesh.material.roughness = .22 + rain * .14;
-    this.mesh.material.envMapIntensity = .9 - cloudiness * .3;
+    this.mesh.material.roughness = .12 + rain * .16;
+    this.mesh.material.envMapIntensity = .95 - cloudiness * .3;
   }
 
   dispose() { this.reflection.dispose(); this.mesh.geometry.dispose(); this.mesh.material.dispose(); }

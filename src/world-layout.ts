@@ -43,7 +43,7 @@ export function groundRule(type:BuildingType, n:Direction):string|null {
   }
   if(type==='lumber' && Math.min(...FORESTS.map(f=>distanceOnPlanet(n,f)))>2.4) return '伐木棚需要靠近树木资源';
   if((type==='quarry'||type==='mine') && Math.min(...ROCKS.map(f=>distanceOnPlanet(n,f)))>2.65) return '采掘设施需要靠近岩丘';
-  const treeClearance=(type==='smelter'||type==='machine')?.65:.22;
+  const treeClearance=BUILDINGS[type].tall?.65:.22;
   if(FORESTS.some(f=>distanceOnPlanet(n,f)<radius+treeClearance)) return treeClearance>.22?'请为高大设施留出树冠间距，选择开阔地':'占地与树干重叠，请在林间空地选址';
   return null;
 }

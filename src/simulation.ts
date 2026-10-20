@@ -7,7 +7,9 @@ export interface Research {id:TechId;progress:number;}
 export interface GameEvent {id:number;text:string;buildingId?:string;}
 export interface GameGoal {title:string;done:boolean;detail:string;action:string;}
 export type ActionResult={ok:true;id?:string}|{ok:false;reason:string};
-export interface SaveGame {version:2;resources:Stock;buildings:Building[];people:Citizen[];elapsed:number;growthProgress:number;growthEnabled:boolean;hungry:boolean;paused:boolean;speed:1|2|4;buildersWanted:number;technologies:TechId[];research:Research|null;nextId:number;totalProduced:Stock;chapter:number;era:EraId;}
+export interface SaveGame {version:2;resources:Stock;buildings:Building[];people:Citizen[];elapsed:number;growthProgress:number;growthEnabled:boolean;hungry:boolean;paused:boolean;speed:1|2|4;buildersWanted:number;technologies:TechId[];research:Research|null;nextId:number;totalProduced:Stock;chapter:number;era:EraId;sandbox?:boolean;}
+/** Test planets staff facilities with up to this many residents so production animations run. */
+export const SANDBOX_POPULATION=24;
 const EPS=1e-8;
 
 /** One authoritative clock owns resources, jobs, recipes, construction and progression. */
@@ -20,8 +22,14 @@ export class GameSimulation {
   technologies:TechId[]=[];research:Research|null=null;
   totalProduced:Stock=emptyStock();chapter=0;era:EraId='gathering';
   events:GameEvent[]=[];revision=0;
+  /** Test mode: everything unlocked, construction instant and free, stocks topped up; never shares the real save. */
+  sandbox=false;
   private nextId=7;private eventId=0;
   constructor(){this.reconcile();}
+  static createSandbox(){
+    const game=new GameSimulation();game.sandbox=true;game.technologies=Object.keys(TECHNOLOGIES) as TechId[];game.chapter=CHAPTERS.length;game.era='industrial';game.growthEnabled=false;
+    for(const b of game.buildings)b.limit=0;game.topUp();game.reconcile();return game;
+  }
   get population(){return this.people.length;}
   get capacity(){return Math.min(MAX_POPULATION,this.buildings.filter(b=>b.built).reduce((sum,b)=>sum+(BUILDINGS[b.type].capacity||0),0));}
   get foodCapacity(){return BASE_FOOD_CAPACITY+this.buildings.filter(b=>b.built).reduce((n,b)=>n+(BUILDINGS[b.type].storage||0),0);}
@@ -110,6 +118,7 @@ export class GameSimulation {
   status(b:Building){
     if(!b.built)return b.paused?'施工已暂停':this.builders===0?'等待建造工':this.projects.find(p=>!p.paused)?.id!==b.id?'施工排队中':`施工中 · ${Math.floor(b.progress/BUILDINGS[b.type].work*100)}%`;
     if(b.paused)return '已暂停';
+    if(BUILDINGS[b.type].concept)return '概念模型 · 测试展示';
     if(BUILDINGS[b.type].capacity)return `提供 ${BUILDINGS[b.type].capacity} 个居住名额`;
     if(b.type==='warehouse')return '资源全星球共享';
     if(b.type==='well')return `灌溉范围内 ${this.farmsCovered(b.siteId).length} 座农田`;
@@ -125,7 +134,7 @@ export class GameSimulation {
   private emit(text:string,buildingId?:string){this.events.push({id:++this.eventId,text,buildingId});if(this.events.length>25)this.events.shift();}
   private pay(cost:Partial<Stock>){for(const r of RESOURCE_KEYS)this.resources[r]=Math.max(0,this.resources[r]-(cost[r]||0));}
   private costError(cost:Stock){const missing=RESOURCE_KEYS.filter(r=>this.resources[r]+EPS<cost[r]);return missing.length?`材料不足：还需要 ${missing.map(r=>`${Math.ceil(cost[r]-this.resources[r])} ${RESOURCE_NAMES[r]}`).join('、')}`:null;}
-  buildingUnlockError(type:BuildingType){const tech=BUILDINGS[type].technology;return tech&&!this.technologies.includes(tech)?`需要先完成${TECHNOLOGIES[tech].name}`:null;}
+  buildingUnlockError(type:BuildingType){if(this.sandbox)return null;if(BUILDINGS[type].concept)return '概念模型仅在测试模式中建造';const tech=BUILDINGS[type].technology;return tech&&!this.technologies.includes(tech)?`需要先完成${TECHNOLOGIES[tech].name}`:null;}
   placementError(type:BuildingType,siteId:string,includeCost=true):string|null {
     if(type==='warehouse')return '储物点已经建成';
     const d=BUILDINGS[type],site=SITE_BY_ID.get(siteId);if(!site)return '请选择标记的可建位置';
@@ -133,14 +142,31 @@ export class GameSimulation {
     const terrain=groundRule(type,site.direction);if(terrain)return terrain;
     for(const b of this.buildings){const other=SITE_BY_ID.get(b.siteId)!;if(b.siteId===siteId||distanceOnPlanet(site.direction,other.direction)<d.radius+BUILDINGS[b.type].radius+.06)return `占地与${BUILDINGS[b.type].name}重叠`;}
     if(this.buildings.length>=80)return '当前聚落的建设数量已达上限';
-    return includeCost?this.costError(d.cost):null;
+    return includeCost&&!this.sandbox?this.costError(d.cost):null;
   }
   availableSites(type:BuildingType){return BUILD_SITES.filter(s=>!this.placementError(type,s.id,false));}
   build(type:BuildingType,siteId:string,yaw=0):ActionResult {
     const reason=this.placementError(type,siteId);if(reason)return {ok:false,reason};
-    this.pay(BUILDINGS[type].cost);
-    const b:Building={id:`b${this.nextId++}`,type,siteId,yaw:Number.isFinite(yaw)?yaw:0,progress:0,built:false,desiredWorkers:0,priority:BUILDINGS[type].output==='food'?3:1,paused:false,initial:false,produced:0,limit:BUILDINGS[type].defaultLimit||0};
-    this.buildings.push(b);this.revision++;this.reconcile();this.emit(`${BUILDINGS[type].name}已安排施工`,b.id);return {ok:true,id:b.id};
+    const d=BUILDINGS[type],sandbox=this.sandbox;
+    if(!sandbox)this.pay(d.cost);
+    const b:Building={id:`b${this.nextId++}`,type,siteId,yaw:Number.isFinite(yaw)?yaw:0,progress:sandbox?d.work:0,built:sandbox,desiredWorkers:sandbox&&d.jobs&&type!=='workshop'?1:0,priority:d.output==='food'?3:1,paused:false,initial:false,produced:0,limit:sandbox?0:d.defaultLimit||0};
+    this.buildings.push(b);this.revision++;if(sandbox)this.staffSandbox();this.reconcile();this.emit(sandbox?`${d.name}已建成（测试模式）`:`${d.name}已安排施工`,b.id);return {ok:true,id:b.id};
+  }
+  /** Test mode only: removes a placed facility; the six starting facilities stay so the save remains valid. */
+  removeBuilding(id:string):ActionResult {
+    const b=this.building(id);if(!this.sandbox)return {ok:false,reason:'拆除尚未开放，仅测试模式可以移除建筑'};
+    if(!b||b.initial)return {ok:false,reason:'初始聚落设施保留，不能移除'};
+    this.buildings=this.buildings.filter(x=>x.id!==id);this.revision++;this.reconcile();this.emit(`${BUILDINGS[b.type].name}已移除（测试模式）`);return {ok:true};
+  }
+  /** Adds residents for staffed jobs on a test planet, capped for rendering cost. */
+  private staffSandbox(){
+    const wanted=Math.min(SANDBOX_POPULATION,this.buildings.filter(b=>b.built&&!b.paused&&(b.type!=='workshop'||!!this.research)).reduce((n,b)=>n+b.desiredWorkers,0));
+    while(this.people.length<wanted){const id=Math.max(...this.people.map(p=>p.id))+1;this.people.push({id,job:null,time:0,deliveries:0});}
+  }
+  /** Keeps test-planet stocks away from shortages so every chain keeps animating. */
+  private topUp(){
+    for(const r of RESOURCE_KEYS)if(r!=='food')this.resources[r]=Math.max(this.resources[r],400);
+    this.resources.food=Math.min(Math.max(this.resources.food,this.foodCapacity*.4),this.foodCapacity*.9);
   }
   cancelConstruction(id:string):ActionResult {
     const b=this.building(id);if(!b||b.built)return {ok:false,reason:'只能取消尚未完工的建设'};
@@ -214,13 +240,16 @@ export class GameSimulation {
       this.growthProgress+=dt;if(this.growthProgress>=GROWTH_SECONDS-EPS){this.growthProgress=0;this.resources.food-=6;const id=Math.max(...this.people.map(p=>p.id))+1;this.people.push({id,job:null,time:0,deliveries:0});this.reconcile();this.emit(`一位新居民加入聚落，人口达到 ${this.population} 人`);}
     }
     if(this.era==='gathering'&&this.technologies.includes('agriculture')&&this.buildings.some(b=>b.type==='farm'&&b.produced>0)){this.era='farming';this.emit('田野开始供粮，聚落进入农耕时代');}
+    if(this.sandbox)this.topUp();
   }
-  save():SaveGame{return JSON.parse(JSON.stringify({version:2,resources:this.resources,buildings:this.buildings,people:this.people,elapsed:this.elapsed,growthProgress:this.growthProgress,growthEnabled:this.growthEnabled,hungry:this.hungry,paused:this.paused,speed:this.speed,buildersWanted:this.buildersWanted,technologies:this.technologies,research:this.research,nextId:this.nextId,totalProduced:this.totalProduced,chapter:this.chapter,era:this.era}));}
-  static load(raw:unknown):GameSimulation|null {
+  save():SaveGame{return JSON.parse(JSON.stringify({version:2,resources:this.resources,buildings:this.buildings,people:this.people,elapsed:this.elapsed,growthProgress:this.growthProgress,growthEnabled:this.growthEnabled,hungry:this.hungry,paused:this.paused,speed:this.speed,buildersWanted:this.buildersWanted,technologies:this.technologies,research:this.research,nextId:this.nextId,totalProduced:this.totalProduced,chapter:this.chapter,era:this.era,...(this.sandbox?{sandbox:true}:{})}));}
+  /** Validates a save. Test-planet saves only load as sandboxes, and real saves never contain concept facilities. */
+  static load(raw:unknown,options:{sandbox?:boolean}={}):GameSimulation|null {
     try{
       const data=JSON.parse(JSON.stringify(raw)) as Omit<SaveGame,'version'>&{version:number};
       const number=(n:unknown,max=1e8)=>typeof n==='number'&&Number.isFinite(n)&&n>=0&&n<=max;
       if(!data||![1,2].includes(data.version)||!data.resources)return null;
+      const sandbox=data.sandbox===true;if(sandbox!==!!options.sandbox)return null;
       const legacy=data.version===1;
       if(legacy){for(const r of ['ore','metal','tools','parts'] as Resource[])data.resources[r]??=0;data.totalProduced=emptyStock();data.chapter=0;data.era='gathering';}
       if(!RESOURCE_KEYS.every(r=>number(data.resources[r]))||!data.totalProduced||!RESOURCE_KEYS.every(r=>number(data.totalProduced[r])))return null;
@@ -230,7 +259,7 @@ export class GameSimulation {
       const ids=new Set<string>(),sites=new Set<string>();
       for(const b of data.buildings){
         if(!b||typeof b.id!=='string'||!/^b\d+$/.test(b.id)||ids.has(b.id)||!Object.hasOwn(BUILDINGS,b.type)||!SITE_BY_ID.has(b.siteId)||sites.has(b.siteId))return null;
-        const d=BUILDINGS[b.type];if(legacy){b.produced??=0;b.limit??=d.defaultLimit||0;}
+        const d=BUILDINGS[b.type];if(d.concept&&!sandbox)return null;if(legacy){b.produced??=0;b.limit??=d.defaultLimit||0;}
         if(!number(b.progress,d.work)||!number(b.produced)||!number(b.limit,1000)||!Number.isInteger(b.limit)||typeof b.built!=='boolean'||typeof b.paused!=='boolean'||typeof b.initial!=='boolean'||!Number.isFinite(b.yaw))return null;
         if(!Number.isInteger(b.desiredWorkers)||b.desiredWorkers<0||b.desiredWorkers>d.jobs||![1,2,3].includes(b.priority))return null;
         if(b.built&&Math.abs(b.progress-d.work)>EPS)return null;if(!b.built&&(b.initial||d.work===0||b.progress>=d.work))return null;
@@ -243,10 +272,10 @@ export class GameSimulation {
       if(data.research&&(!Object.hasOwn(TECHNOLOGIES,data.research.id)||data.technologies.includes(data.research.id)||!number(data.research.progress,TECHNOLOGIES[data.research.id].work)))return null;
       if(!number(data.elapsed)||!number(data.growthProgress,GROWTH_SECONDS)||![1,2,4].includes(data.speed)||!Number.isInteger(data.buildersWanted)||data.buildersWanted<0||data.buildersWanted>4)return null;
       if(typeof data.paused!=='boolean'||typeof data.growthEnabled!=='boolean'||typeof data.hungry!=='boolean')return null;
-      const game=new GameSimulation();
+      const game=new GameSimulation();game.sandbox=sandbox;
       for(const key of ['resources','buildings','people','elapsed','growthProgress','growthEnabled','hungry','paused','speed','buildersWanted','technologies','research','totalProduced','chapter','era'] as const)Object.assign(game,{[key]:data[key]});
       const minimumId=Math.max(...game.buildings.map(b=>Number(b.id.slice(1))))+1;game.nextId=Number.isSafeInteger(data.nextId)&&data.nextId>=minimumId&&data.nextId<=1e8?data.nextId:minimumId;
-      if(game.population>game.capacity)return null;game.reconcile();return game;
+      if(!sandbox&&game.population>game.capacity)return null;game.reconcile();return game;
     }catch{return null;}
   }
 }

@@ -3,8 +3,10 @@ import { mesh, rng, standard, vec } from './craft';
 import { facilityDistance, pathDistance } from './terrain';
 import { NORTH, SETTLEMENT_SCALE, placeOnPlanet, plotDirection, surfacePoint } from './planet-surface';
 import { makeShrub, treeLocations } from './trees';
+import { boulderGeometry, rockMaterial } from './building-kit';
+import type { SceneryClearance } from './scenery';
 
-export function makeDecor(parent: THREE.Object3D) {
+export function makeDecor(parent: THREE.Object3D, scenery?: SceneryClearance) {
   const random = rng(73), dummy = new THREE.Object3D();
   const wrapInstance = () => {
     const { x, y, z } = dummy.position;
@@ -35,18 +37,16 @@ export function makeDecor(parent: THREE.Object3D) {
   grassMat.customProgramCacheKey = () => 'grass-soft-normal';
   const m = mesh(grass, grassMat, parent); m.castShadow = false;
 
-  const rockGeo = new THREE.IcosahedronGeometry(1, 1), pos = rockGeo.attributes.position;
-  for (let i = 0; i < pos.count; i++) { const x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i), distortion = 1 + .11 * Math.sin(x * 9 + z * 5) * Math.cos(y * 8); pos.setXYZ(i, x * distortion, y * distortion, z * distortion); }
-  rockGeo.computeVertexNormals();
-  const rocks = new THREE.InstancedMesh(rockGeo, standard('#acac96'), 190);
+  // Two weathered boulder shapes with baked shading; each instance gets its own stone colour.
+  const rocks = [boulderGeometry(71, 2, .7), boulderGeometry(83, 2, .35)].map(g => new THREE.InstancedMesh(g, rockMaterial, 95));
   for (let i = 0; i < 190; i++) {
     let x: number, z: number, size: number;
     if (i < 24) { const a = random() * Math.PI * 2; const r = 6 * (.95 + random() * .045); x = Math.cos(a) * r; z = Math.sin(a) * r; size = .14 + random() * .25; }
     else { const a = random() * Math.PI * 2, r = Math.sqrt(random()) * 5.55; x = Math.cos(a) * r; z = Math.sin(a) * r; size = .025 + random() * .06; if (pathDistance(x, z) > .9 && facilityDistance(x, z) > .3 && i < 44) size = .25 + random() * .18; }
-    dummy.position.set(x, 0 - size * .27, z); dummy.rotation.set(random(), random() * 6, random()); dummy.scale.set(size * (1 + random() * .6), size * .7, size); wrapInstance(); dummy.updateMatrix(); rocks.setMatrixAt(i, dummy.matrix);
-    rocks.setColorAt(i, new THREE.Color().setHSL(.12, .1, .74 + random() * .16));
+    dummy.position.set(x, 0 - size * .2, z); dummy.rotation.set(random() * .3 - .15, random() * 6, random() * .3 - .15); dummy.scale.set(size * (1 + random() * .6), size * .7, size); wrapInstance(); dummy.updateMatrix();
+    const m = rocks[i % 2]; m.setMatrixAt(i >> 1, dummy.matrix); m.setColorAt(i >> 1, new THREE.Color().setHSL(.12, .1, .6 + random() * .14));
   }
-  rocks.castShadow = true; rocks.receiveShadow = true; parent.add(rocks);
+  for (const m of rocks) { m.castShadow = m.receiveShadow = true; parent.add(m); scenery?.register(m); }
   const bushes = [[-4.5, -2.5, .27], [-4.7, 1, .34], [-3.9, 3, .26], [-1.5, -4.5, .31], [1.8, -4.2, .32], [4.8, -1.8, .3], [4.3, 1.5, .27], [2.9, 4.3, .25], [-1.5, 4.4, .24]];
   bushes.forEach(([x, z, size], i) => { const b = makeShrub(i * 37 + 3, size); placeOnPlanet(b, x, z); parent.add(b); });
 
@@ -60,7 +60,7 @@ export function makeDecor(parent: THREE.Object3D) {
     dummy.position.set(x, y, z); dummy.rotation.set(0, 0, 0); dummy.scale.setScalar(1); wrapInstance(); dummy.updateMatrix(); hearts.setMatrixAt(i, dummy.matrix);
     for (let p = 0; p < 6; p++) { const a = p / 6 * Math.PI * 2; dummy.position.set(x + Math.cos(a) * .024, y, z + Math.sin(a) * .024); dummy.rotation.set(0, -a, 0); dummy.scale.set(.026, .009, .012); wrapInstance(); dummy.updateMatrix(); flowers.setMatrixAt(i * 6 + p, dummy.matrix); }
   }
-  parent.add(flowers, hearts);
+  parent.add(flowers, hearts); scenery?.register(flowers, 2); scenery?.register(hearts, .05);
 
   // Fallen leaves collect at tree bases, leaving the route open.
   const fallen = new THREE.InstancedMesh(new THREE.CircleGeometry(1, 5), standard('#b49a4c'), 250);

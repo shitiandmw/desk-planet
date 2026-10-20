@@ -9,8 +9,10 @@ const west = new THREE.Vector3(-.86, -.4, .32).normalize();
 const bay = new THREE.Vector3(-.34, .63, .7).normalize();
 const ridge = new THREE.Vector3(.48, .8, -.35).normalize();
 const backBay = new THREE.Vector3(.68, -.16, -.72).normalize();
+/** Field anchors shared with the per-pixel GLSL mirror in planet-glsl.ts. */
+export const FIELD_ANCHORS = { west, bay, ridge, backBay, back: BACK_LAND };
 
-/** A global 3D field has neither a longitude seam nor an unmodeled hemisphere. */
+/** A global 3D field has neither a longitude seam nor an unmodeled hemisphere. Mirrored in planet-glsl.ts (tested). */
 export function landField(n: THREE.Vector3) {
   const broad = .045 * Math.sin(n.x * 13 + n.z * 7) * Math.cos(n.y * 11 - n.z * 6);
   const fine = .018 * Math.sin(n.x * 31 + n.y * 17) * Math.cos(n.z * 27 - n.x * 9);

@@ -10,12 +10,14 @@ import { makeTerrain } from './terrain';
 import { BACK_LAND, dragRotation, NORTH, PLANET_RADIUS, placeOnPlanet } from './planet-surface';
 import { makePlanetNature } from './planet-nature';
 import { makeTree, Tree, treeLocations } from './trees';
+import { SceneryClearance } from './scenery';
 import { stump } from './props';
 import { makeDecor } from './decor';
 import { GameSimulation, type ActionResult } from './simulation';
 import { BUILDINGS, type BuildingType, type Direction } from './game-data';
 import { ALL_SITES, SITE_BY_ID, directionVector, nearestSite } from './world-layout';
 import { SettlementView, onSurface } from './settlement-view';
+import { M, setBuildingEnvironment, setEveningLights } from './building-kit';
 import { PlanetWeather } from './weather';
 import type { WeatherMode } from './weather-state';
 
@@ -33,7 +35,9 @@ export class WoodlandScene {
   preview: { type: BuildingType; siteId: string | null; direction: Direction; yaw: number; error: string | null } | null = null;
   wind = true;
   autoRotate = false;
-  nature: Tree[] = [];
+  /** Instanced background trees (baked prototypes, no per-tree sway). */
+  backgroundTrees = 0;
+  private scenery = new SceneryClearance();
   readonly weather: PlanetWeather;
   private warmLight = false;
   private localSun = new THREE.Vector3();
@@ -64,14 +68,27 @@ export class WoodlandScene {
   private disposed = false;
   private phase = 0;
   private resizeObserver: ResizeObserver;
-  private normalBudget = Math.min(window.devicePixelRatio, 1.6);
-  private lowPerformanceFrames = 0;
+  /** Render resolution: up to 2× on high-density screens, stepped down while frames run long. */
+  private normalBudget = Math.min(window.devicePixelRatio, 2);
+  private frameAverage = 16;
+  private slowTime = 0;
+  private shadowAge = 0;
+  private shadowRotation = new THREE.Quaternion(0, 0, 0, 0);
+  private shadowFit = '';
+  private fitRay = new THREE.Ray();
+  private fitPoint = new THREE.Vector3();
+  private fitSphere = new THREE.Sphere(new THREE.Vector3(), PLANET_RADIUS);
   private dirty = true;
 
   constructor(public host: HTMLElement, public simulation: GameSimulation) {
-    this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, powerPreference: 'high-performance', preserveDrawingBuffer: true });
+    // Every pass renders off screen and SMAA smooths the edges, so the canvas itself needs neither MSAA nor a preserved
+    // buffer (capture() renders right before reading it back).
+    this.renderer = new THREE.WebGLRenderer({ antialias: false, alpha: false, powerPreference: 'high-performance' });
     this.renderer.setPixelRatio(this.normalBudget);
     this.renderer.shadowMap.enabled = true; this.renderer.shadowMap.type = THREE.VSMShadowMap;
+    // Shadows are refreshed explicitly (see frame): the SSAO prepass renders the scene a second time and would
+    // otherwise redraw and re-blur the shadow map with it.
+    this.renderer.shadowMap.autoUpdate = false;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping; this.renderer.toneMappingExposure = 1.05;
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.info.autoReset = false;
@@ -86,7 +103,7 @@ export class WoodlandScene {
     this.sun = new THREE.DirectionalLight('#fff0d0', 3.3); this.sun.position.set(-10, 16, 14).multiplyScalar(PLANET_RADIUS / 6); this.sun.target.position.set(0, 0, 0);
     this.sun.castShadow = true; this.sun.shadow.mapSize.set(2048, 2048);
     Object.assign(this.sun.shadow.camera, { left: -PLANET_RADIUS - 4, right: PLANET_RADIUS + 4, top: PLANET_RADIUS + 5, bottom: -PLANET_RADIUS - 4, near: .5, far: PLANET_RADIUS * 8 });
-    this.sun.shadow.bias = -.00012; this.sun.shadow.normalBias = .018; this.sun.shadow.radius = 10; this.sun.shadow.blurSamples = 12;
+    this.sun.shadow.bias = -.00012; this.sun.shadow.normalBias = .018; this.sun.shadow.radius = 3; this.sun.shadow.blurSamples = 6;
     this.scene.add(this.sun, this.sun.target);
     const bounce = new THREE.DirectionalLight('#e4edd7', .55); bounce.position.set(5, 4, -6); this.scene.add(bounce);
 
@@ -100,24 +117,33 @@ export class WoodlandScene {
       this.world.add(tree.root); this.trees.push(tree);
     });
     for (const [x, z, seed] of [[-1.7, 1.4, 3], [3, .5, 6]]) { const s = stump(seed); placeOnPlanet(s, x, z); this.world.add(s); }
-    makeDecor(this.world);
-    this.nature = makePlanetNature(this.world);
+    makeDecor(this.world, this.scenery);
+    this.backgroundTrees = makePlanetNature(this.world, this.scenery);
     this.ring = new THREE.Mesh(new THREE.RingGeometry(.97, 1.03, 64), new THREE.MeshBasicMaterial({ color: '#e2c77f', side: THREE.DoubleSide, transparent: true, opacity: .9, depthWrite: false }));
     this.ring.visible = false; this.world.add(this.ring);
 
+    setBuildingEnvironment(this.surface.oceanSurface.environment);
     this.settlement = new SettlementView(this.world, this.simulation);
+    this.settlement.onLayout = footprints => { this.scenery.apply(footprints); this.dirty = true; };
+    this.scenery.apply(this.settlement.footprints);
+    this.sharpenTextures();
 
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
     this.controls.enableDamping = true; this.controls.dampingFactor = .075;
-    this.controls.minDistance = PLANET_RADIUS + 3.2; this.controls.maxDistance = PLANET_RADIUS * 6.8;
+    this.controls.maxDistance = PLANET_RADIUS * 6.8; this.updateZoomLimit();
     this.controls.enableRotate = false; this.controls.enablePan = false;
     this.controls.addEventListener('start', () => { this.cameraMove = null; });
     this.setView('planet', false);
     this.composer = new EffectComposer(this.renderer);
     this.composer.addPass(new RenderPass(this.scene, this.camera));
     this.ao = new SSAOPass(this.scene, this.camera, 1, 1, 16); this.ao.kernelRadius = .28; this.ao.minDistance = .002; this.ao.maxDistance = .16;
+    // Occlusion is blurred anyway; computing it at half resolution quarters its cost.
+    const setAOSize = this.ao.setSize.bind(this.ao);
+    this.ao.setSize = (width: number, height: number) => setAOSize(Math.max(1, Math.round(width / 2)), Math.max(1, Math.round(height / 2)));
+    this.hideTransparentFromAO();
     this.composer.addPass(this.ao); this.composer.addPass(new OutputPass()); this.composer.addPass(new SMAAPass());
     this.resizeObserver = new ResizeObserver(() => this.resize()); this.resizeObserver.observe(host); this.resize();
+    this.warmUpMaterials();
     this.bindPicking(); this.animation = requestAnimationFrame(this.frame);
     document.addEventListener('visibilitychange', this.handleVisibility);
   }
@@ -150,13 +176,14 @@ export class WoodlandScene {
       ? new THREE.Quaternion().setFromUnitVectors(BACK_LAND, c.position.clone().normalize())
       : this.initialRotation.clone();
     if (animate && !this.reducedMotion) this.cameraMove = { start: this.camera.position.clone(), end: c.position, targetStart: this.controls.target.clone(), targetEnd: c.target, rotationStart: this.world.quaternion.clone(), rotationEnd: rotation, time: 0 };
-    else { this.camera.position.copy(c.position); this.controls.target.copy(c.target); this.world.quaternion.copy(rotation); this.controls.update(); }
+    else { this.camera.position.copy(c.position); this.controls.target.copy(c.target); this.world.quaternion.copy(rotation); this.updateZoomLimit(); this.controls.update(); }
     this.dirty = true;
     this.selectBuilding(null);
   }
 
   setLight(warm: boolean) {
     this.warmLight = warm; this.dirty = true;
+    setEveningLights(warm);
     this.sun.position.set(warm ? -16 : -10, warm ? 9 : 16, 14).multiplyScalar(PLANET_RADIUS / 6);
     this.updateWeatherLighting();
   }
@@ -195,13 +222,52 @@ export class WoodlandScene {
     const rotation = new THREE.Quaternion().setFromUnitVectors(directionVector(direction), surfaceNormal);
     const targetEnd = surfaceNormal.clone().multiplyScalar(PLANET_RADIUS * .88);
     const end = targetEnd.clone().addScaledVector(normal, PLANET_RADIUS * (this.host.clientWidth < 760 ? 2.9 : 2.5));
-    if (this.reducedMotion) { this.camera.position.copy(end); this.controls.target.copy(targetEnd); this.world.quaternion.copy(rotation); this.controls.update(); }
+    if (this.reducedMotion) { this.camera.position.copy(end); this.controls.target.copy(targetEnd); this.world.quaternion.copy(rotation); this.updateZoomLimit(); this.controls.update(); }
     else this.cameraMove = { start: this.camera.position.clone(), end, targetStart: this.controls.target.clone(), targetEnd, rotationStart: this.world.quaternion.clone(), rotationEnd: rotation, time: 0 };
     this.dirty = true;
   }
   focusBuilding(id: string) {
     const b = this.simulation.building(id); if (!b) return;
     this.focusDirection(SITE_BY_ID.get(b.siteId)!.direction); this.selectBuilding(id);
+  }
+  /** Close three-quarter view: the planet turns so the facility stands upright with its front toward the camera. */
+  inspectBuilding(id: string) {
+    const b = this.simulation.building(id), view = this.settlement.buildings.get(id); if (!b || !view) return;
+    this.autoRotate = false;
+    const definition = BUILDINGS[b.type], n = directionVector(SITE_BY_ID.get(b.siteId)!.direction);
+    const facing = new THREE.Quaternion().setFromUnitVectors(NORTH, n).multiply(new THREE.Quaternion().setFromAxisAngle(NORTH, b.yaw));
+    const height = definition.tall ? (b.type === 'elevator' ? 3.6 : 1.5) : .75, mobile = this.host.clientWidth < 760;
+    const distance = (definition.radius * 3.4 + height * 1.25 + 1.1) * (mobile ? 1.35 : 1), elevation = .5;
+    const azimuth = this.clearAzimuth(view.root, n, facing, height * .45, distance, elevation);
+    const front = vec(Math.sin(azimuth), 0, Math.cos(azimuth)).applyQuaternion(facing), side = new THREE.Vector3().crossVectors(n, front);
+    const rotation = new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(side, n, front)).invert();
+    const targetEnd = vec(0, onSurface(n).length() + height * .45, 0);
+    const end = targetEnd.clone().add(vec(0, Math.sin(elevation), Math.cos(elevation)).multiplyScalar(distance));
+    if (this.reducedMotion) { this.camera.position.copy(end); this.controls.target.copy(targetEnd); this.world.quaternion.copy(rotation); this.updateZoomLimit(); this.controls.update(); }
+    else this.cameraMove = { start: this.camera.position.clone(), end, targetStart: this.controls.target.clone(), targetEnd, rotationStart: this.world.quaternion.clone(), rotationEnd: rotation, time: 0 };
+    this.dirty = true; this.selectBuilding(id);
+  }
+  /** Prefers a front three-quarter view, then sides and back, keeping the first that no tree, rock or neighbour hides. */
+  private clearAzimuth(target: THREE.Object3D, n: THREE.Vector3, facing: THREE.Quaternion, lift: number, distance: number, elevation: number) {
+    this.world.updateMatrixWorld(true);
+    const people = new Set([...this.settlement.actors.values()].map(a => a.root as THREE.Object3D));
+    const blockers = this.world.children.filter(o => o.visible && o !== target && o !== this.surface.terrain && o !== this.surface.ocean && !people.has(o));
+    const origin = onSurface(n).addScaledVector(n, lift), from = this.world.localToWorld(origin.clone());
+    let best = .62, clearest = -1;
+    for (const azimuth of [.62, -.62, 1.2, -1.2, 0, 2.2, -2.2, Math.PI]) {
+      const front = vec(Math.sin(azimuth), 0, Math.cos(azimuth)).applyQuaternion(facing);
+      const eye = this.world.localToWorld(origin.clone().addScaledVector(n, Math.sin(elevation) * distance).addScaledVector(front, Math.cos(elevation) * distance));
+      this.ray.set(from, eye.sub(from).normalize()); this.ray.far = distance;
+      const hit = this.ray.intersectObjects(blockers, true).find(h => {
+        const material = (h.object as THREE.Mesh).material as THREE.Material | undefined;
+        return (h.object as THREE.Mesh).isMesh && !material?.transparent && h.object.name !== 'chimney-smoke';
+      });
+      const clear = hit ? hit.distance : Infinity;
+      if (clear > clearest) { clearest = clear; best = azimuth; }
+      if (!hit) break;
+    }
+    this.ray.far = Infinity;
+    return best;
   }
   beginBuild(type: BuildingType) {
     this.selectBuilding(null); this.autoRotate = false;
@@ -234,7 +300,7 @@ export class WoodlandScene {
     this.updatePreview(); const p = this.preview;
     if (!p || p.error || !p.siteId) return { ok: false, reason: p?.error || '请先选择位置' };
     const result = this.simulation.build(p.type, p.siteId, p.yaw);
-    if (result.ok) { this.cancelBuild(); this.settlement.sync(); this.selectBuilding(result.id!); }
+    if (result.ok) { this.cancelBuild(); this.syncSettlement(); this.selectBuilding(result.id!); }
     return result;
   }
 
@@ -288,14 +354,86 @@ export class WoodlandScene {
     canvas.style.cursor = 'grab';
   }
 
+  /** Anisotropic filtering keeps roofs, walls and the meadow sharp at grazing angles. */
+  private sharpenTextures() {
+    const anisotropy = Math.min(8, this.renderer.capabilities.getMaxAnisotropy());
+    const sharpen = (material: THREE.Material) => {
+      for (const key of ['map', 'bumpMap', 'normalMap', 'roughnessMap', 'emissiveMap'] as const) {
+        const texture = (material as THREE.MeshStandardMaterial)[key];
+        if (texture && texture.anisotropy < anisotropy) { texture.anisotropy = anisotropy; texture.needsUpdate = true; }
+      }
+    };
+    this.scene.traverse(o => { const material = (o as THREE.Mesh).material; if (material) for (const m of Array.isArray(material) ? material : [material]) sharpen(m); });
+    Object.values(M).forEach(sharpen);
+  }
+  /** Compiles every building-kit material up front, so the first farm or factory does not stall a frame. */
+  private warmUpMaterials() {
+    const group = new THREE.Group(), geometry = new THREE.BoxGeometry(.001, .001, .001);
+    for (const material of Object.values(M)) { const m = new THREE.Mesh(geometry, material); m.castShadow = m.receiveShadow = true; group.add(m); }
+    this.scene.add(group); this.renderer.compile(this.scene, this.camera); this.scene.remove(group); geometry.dispose();
+  }
+  /**
+   * Fits the sun's shadow frustum to the part of the planet the camera can see. From afar that is the whole globe,
+   * as before; zoomed in, the same 2048² map covers a few metres, so eaves, fences and window sills cast crisp
+   * shadows. Sizes come in discrete steps and the centre snaps to whole texels, so zooming does not make shadows crawl.
+   */
+  private fitShadows() {
+    const light = this.sun.shadow.camera;
+    light.position.copy(this.sun.position); light.lookAt(this.sun.target.position); light.updateMatrixWorld();
+    this.camera.updateMatrixWorld();
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+    for (let i = 0; i < 25; i++) {
+      this.fitRay.origin.copy(this.camera.position);
+      this.fitRay.direction.set(i % 5 / 2 - 1, Math.floor(i / 5) / 2 - 1, .5).unproject(this.camera).sub(this.camera.position).normalize();
+      // Rays past the limb count the horizon point; everything is measured in the light's view.
+      const p = this.fitRay.intersectSphere(this.fitSphere, this.fitPoint) ?? this.fitRay.closestPointToPoint(this.fitSphere.center, this.fitPoint).setLength(this.fitSphere.radius);
+      p.applyMatrix4(light.matrixWorldInverse);
+      minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x); minY = Math.min(minY, p.y); maxY = Math.max(maxY, p.y);
+    }
+    const full = 2 * PLANET_RADIUS + 9, needed = Math.max(maxX - minX, maxY - minY) + 2.4;
+    let size = full; while (size * .84 > needed) size *= .84;
+    const texel = size / this.sun.shadow.mapSize.x, x = Math.round((minX + maxX) / 2 / texel) * texel, y = Math.round((minY + maxY) / 2 / texel) * texel;
+    const key = size === full ? 'globe' : `${size}:${x}:${y}`, mapScale = 2048 / this.sun.shadow.mapSize.x;
+    if (key === this.shadowFit) return;
+    if (size === full) Object.assign(light, { left: -PLANET_RADIUS - 4, right: PLANET_RADIUS + 4, top: PLANET_RADIUS + 5, bottom: -PLANET_RADIUS - 4 });
+    else Object.assign(light, { left: x - size / 2, right: x + size / 2, top: y + size / 2, bottom: y - size / 2 });
+    light.updateProjectionMatrix(); this.sun.shadow.normalBias = .018 * size / full * mapScale; this.shadowFit = key; this.renderer.shadowMap.needsUpdate = true;
+  }
+  /** Last resorts on slow graphics at 1×: first the ambient-occlusion pass, then a smaller, lighter shadow map. */
+  private lowerEffects() {
+    const shadow = this.sun.shadow;
+    if (this.ao.enabled) this.ao.enabled = false;
+    else if (shadow.mapSize.x > 1024) {
+      shadow.mapSize.set(1024, 1024); shadow.blurSamples = 4;
+      shadow.map?.dispose(); shadow.map = null; shadow.mapPass?.dispose(); shadow.mapPass = null; this.shadowFit = '';
+    } else return;
+    this.slowTime = 0; this.frameAverage = 16; this.dirty = true;
+  }
+  /** Zoom stops about a unit above the ground wherever the orbit pivot is, so every view can come close to the models. */
+  private updateZoomLimit() { this.controls.minDistance = Math.max(1.2, PLANET_RADIUS + 1.1 - this.controls.target.length()); }
+  /** Animations of concept models follow the render clock so they keep moving while the simulation is paused. */
+  private syncSettlement() { return this.settlement.sync(this.reducedMotion ? 0 : this.phase); }
+  /**
+   * three's SSAO prepass only hides points and lines. Transparent shells (atmosphere rim, clouds, smoke, build
+   * ghosts) would otherwise be drawn opaque into its depth buffer and wash the occlusion out beneath them.
+   */
+  private hideTransparentFromAO() {
+    const ao = this.ao as unknown as { _visibilityCache: THREE.Object3D[]; _overrideVisibility: () => void };
+    ao._overrideVisibility = () => this.scene.traverseVisible(o => {
+      const material = (o as THREE.Mesh).material as THREE.Material | THREE.Material[] | undefined;
+      const transparent = Array.isArray(material) ? material.some(m => m.transparent) : !!material?.transparent;
+      if ((o as THREE.Points).isPoints || (o as THREE.Line).isLine || transparent) { o.visible = false; ao._visibilityCache.push(o); }
+    });
+  }
+
   private frame = (timestamp: number) => {
     if (this.disposed) return;
     const dt = this.previous ? Math.min((timestamp - this.previous) / 1000, .1) : 0;
     this.previous = timestamp;
     this.simulation.tick(dt); this.phase += dt;
-    this.settlement.sync();
-    if (this.wind && !this.reducedMotion) for (const tree of [...this.trees, ...this.nature]) { tree.crown.rotation.z = Math.sin(this.phase * .9 + tree.seed) * .009; tree.crown.rotation.x = Math.sin(this.phase * .7 + tree.seed * .5) * .006; }
-    else for (const tree of [...this.trees, ...this.nature]) tree.crown.rotation.set(0, 0, 0);
+    const animating = this.syncSettlement() && !this.reducedMotion;
+    if (this.wind && !this.reducedMotion) for (const tree of this.trees) { tree.crown.rotation.z = Math.sin(this.phase * .9 + tree.seed) * .009; tree.crown.rotation.x = Math.sin(this.phase * .7 + tree.seed * .5) * .006; }
+    else for (const tree of this.trees) tree.crown.rotation.set(0, 0, 0);
     if (this.autoRotate && this.dragPointer === null && !this.cameraMove) { this.world.rotateOnWorldAxis(NORTH, dt * .13); this.dirty = true; }
     if (this.cameraMove) {
       this.cameraMove.time += dt; const t = Math.min(1, this.cameraMove.time / 1.15), smooth = t * t * (3 - 2 * t);
@@ -308,14 +446,26 @@ export class WoodlandScene {
     const weatherChanged = this.weather.update(dt, this.phase, this.localSun, this.reducedMotion);
     this.surface.oceanSurface.update(this.reducedMotion ? 0 : this.phase, this.weather.state.rain, this.weather.state.cloudiness);
     this.updateWeatherLighting();
+    this.updateZoomLimit();
     const cameraChanged = this.controls.update();
-    if (this.dirty || weatherChanged || cameraChanged || this.cameraMove || (this.wind && !this.reducedMotion) || !this.simulation.paused) {
+    this.fitShadows();
+    if (this.dirty || weatherChanged || cameraChanged || this.cameraMove || animating || (this.wind && !this.reducedMotion) || !this.simulation.paused) {
+      // The shadow map follows the planet every frame while it turns; otherwise only residents and machinery move, so
+      // it refreshes about 12 times a second. Clouds shade the ground through their own uniform and never need it.
+      this.shadowAge += dt;
+      if (this.dirty || this.shadowAge > .08 || !this.shadowRotation.equals(this.world.quaternion)) { this.renderer.shadowMap.needsUpdate = true; this.shadowAge = 0; this.shadowRotation.copy(this.world.quaternion); }
       this.renderer.info.reset(); this.composer.render(); this.dirty = false;
     }
     this.onFrame?.();
-    // Lower resolution only after observing a sustained frame-time problem.
-    if (dt > .045 && dt < .1) this.lowPerformanceFrames++; else this.lowPerformanceFrames = Math.max(0, this.lowPerformanceFrames - 1);
-    if (this.lowPerformanceFrames > 150 && this.renderer.getPixelRatio() > 1) { this.renderer.setPixelRatio(1); this.composer.setPixelRatio(1); this.resize(); this.lowPerformanceFrames = 0; }
+    // Keep motion smooth: once frames miss 60 fps for about a second, lower the render resolution a step; at 1×, every
+    // three slow seconds drop one effect (see lowerEffects). Start-up frames (shader compiles, uploads) are not counted.
+    if (dt > 0 && dt < .25 && this.phase > 3) this.frameAverage += (dt * 1000 - this.frameAverage) * .05;
+    this.slowTime = this.frameAverage > 20 ? this.slowTime + dt : 0;
+    const ratio = this.renderer.getPixelRatio();
+    if (ratio > 1 && this.slowTime > 1) {
+      const next = ratio * .8 < 1.15 ? 1 : ratio * .8; this.renderer.setPixelRatio(next); this.composer.setPixelRatio(next); this.resize();
+      this.slowTime = 0; this.frameAverage = 16;
+    } else if (ratio <= 1 && this.slowTime > 3) this.lowerEffects();
     this.animation = requestAnimationFrame(this.frame);
   };
   private handleVisibility = () => {
@@ -329,6 +479,6 @@ export class WoodlandScene {
     const url = URL.createObjectURL(blob), link = document.createElement('a'); link.href = url; link.download = '微缩星球-planet.png'; link.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
   invalidate() { this.dirty = true; }
-  get metrics() { return { calls: this.renderer.info.render.calls, triangles: this.renderer.info.render.triangles, pixelRatio: this.renderer.getPixelRatio(), trees: this.trees.length + this.nature.length, planetRadius: PLANET_RADIUS, surfaceAreaRatio: (PLANET_RADIUS/6)**2, population: this.simulation.population, buildings: this.simulation.buildings.length, weather: {mode:this.weather.state.mode,cloudiness:this.weather.state.cloudiness,rain:this.weather.state.rain,wetness:this.weather.state.wetness}, globeRotation: this.world.quaternion.toArray(), camera: this.camera.position.toArray() }; }
+  get metrics() { return { calls: this.renderer.info.render.calls, triangles: this.renderer.info.render.triangles, pixelRatio: this.renderer.getPixelRatio(), trees: this.trees.length + this.backgroundTrees, planetRadius: PLANET_RADIUS, surfaceAreaRatio: (PLANET_RADIUS/6)**2, population: this.simulation.population, buildings: this.simulation.buildings.length, sandbox: this.simulation.sandbox, smokeEmitters: this.settlement.smoke.emitterCount, weather: {mode:this.weather.state.mode,cloudiness:this.weather.state.cloudiness,rain:this.weather.state.rain,wetness:this.weather.state.wetness}, globeRotation: this.world.quaternion.toArray(), camera: this.camera.position.toArray() }; }
   dispose() { this.disposed = true; cancelAnimationFrame(this.animation); document.removeEventListener('visibilitychange', this.handleVisibility); this.resizeObserver.disconnect(); this.controls.dispose(); this.ao.dispose(); this.weather.dispose(); this.surface.oceanSurface.dispose(); this.composer.dispose(); this.renderer.dispose(); }
 }

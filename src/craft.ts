@@ -47,11 +47,10 @@ export function beam(parent: THREE.Object3D, a: THREE.Vector3, b: THREE.Vector3,
 }
 
 /** A tapered, curved branch with continuous UVs and fluted bark, including a flared root collar. */
-export function branchGeometry(points: THREE.Vector3[], radii: number[], seed: number, segments = 22) {
+export function branchGeometry(points: THREE.Vector3[], radii: number[], seed: number, segments = 22, sides = 18) {
   const curve = new THREE.CatmullRomCurve3(points);
   const frames = curve.computeFrenetFrames(segments, false);
   const vertices: number[] = [], uv: number[] = [], indices: number[] = [];
-  const sides = 18;
   for (let i = 0; i <= segments; i++) {
     const t = i / segments, p = curve.getPointAt(t);
     const rIndex = t * (radii.length - 1), ix = Math.min(radii.length - 2, Math.floor(rIndex));
@@ -67,20 +66,42 @@ export function branchGeometry(points: THREE.Vector3[], radii: number[], seed: n
   const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3)); geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); geo.setIndex(indices); geo.computeVertexNormals(); return geo;
 }
 
+/** Fill attributes some parts lack (white vertex colour, zero UV) so one material always merges into one draw call. */
+function unifyAttributes(geos: THREE.BufferGeometry[]) {
+  const names = new Set(geos.flatMap(g => Object.keys(g.attributes)));
+  for (const g of geos) for (const name of names) if (!g.attributes[name]) {
+    const count = g.attributes.position.count;
+    if (name === 'color') g.setAttribute('color', new THREE.Float32BufferAttribute(new Float32Array(count * 3).fill(1), 3));
+    else if (name === 'uv') g.setAttribute('uv', new THREE.Float32BufferAttribute(new Float32Array(count * 2), 2));
+    else if (name === 'normal') g.computeVertexNormals();
+    else g.deleteAttribute(name);
+  }
+  for (const g of geos) for (const name of Object.keys(g.attributes)) if (!geos.every(o => o.attributes[name])) g.deleteAttribute(name);
+}
+
+/** Merges static meshes per material. Children flagged `userData.anim` or `userData.separate` keep their own transform. */
 export function mergeMeshes(group: THREE.Group) {
   const buckets = new Map<THREE.Material, THREE.BufferGeometry[]>();
   group.updateMatrixWorld(true);
   const inverse = group.matrixWorld.clone().invert();
-  const children: THREE.Mesh[] = [];
-  group.traverse(obj => { if (obj instanceof THREE.Mesh && !(obj instanceof THREE.InstancedMesh) && !Array.isArray(obj.material)) { const m = new THREE.Matrix4().multiplyMatrices(inverse, obj.matrixWorld); const g = (obj.geometry.index ? obj.geometry.toNonIndexed() : obj.geometry.clone()).applyMatrix4(m); const list = buckets.get(obj.material) || []; list.push(g); buckets.set(obj.material, list); children.push(obj); } });
+  const children: THREE.Mesh[] = [], nested: THREE.Object3D[] = [];
+  const visit = (parent: THREE.Object3D) => {
+    for (const obj of parent.children) {
+      if (obj.userData.anim || obj.userData.separate) { nested.push(obj); continue; }
+      if (obj instanceof THREE.Mesh && !(obj instanceof THREE.InstancedMesh) && !Array.isArray(obj.material)) { const m = new THREE.Matrix4().multiplyMatrices(inverse, obj.matrixWorld); const g = (obj.geometry.index ? obj.geometry.toNonIndexed() : obj.geometry.clone()).applyMatrix4(m); const list = buckets.get(obj.material) || []; list.push(g); buckets.set(obj.material, list); children.push(obj); }
+      visit(obj);
+    }
+  };
+  visit(group);
   for (const c of children) { c.removeFromParent(); c.geometry.dispose(); }
-  for (const [mat, geos] of buckets) { const combined = mergeGeometries(geos, false); if (combined) mesh(combined, mat, group); geos.forEach(g => g.dispose()); }
+  for (const [mat, geos] of buckets) { unifyAttributes(geos); const combined = mergeGeometries(geos, false); if (combined) mesh(combined, mat, group); geos.forEach(g => g.dispose()); }
+  for (const n of nested) if (n instanceof THREE.Group) mergeMeshes(n);
 }
 
-export function leafGeometry() {
-  // Curved, lobed oak leaf. A raised midrib gives readable soft specular variation.
+export function leafGeometry(divisions = 40) {
+  // Curved, lobed oak leaf. A raised midrib gives readable soft specular variation; `divisions` sets the outline detail.
   const positions: number[] = [], uvs: number[] = [], indices: number[] = [];
-  const outline = new THREE.CatmullRomCurve3([[0, 0], [-.16, .16], [-.32, .27], [-.28, .36], [-.39, .48], [-.29, .58], [-.33, .7], [-.2, .8], [0, 1], [.2, .8], [.33, .7], [.29, .58], [.39, .48], [.28, .36], [.32, .27], [.16, .16]].map(([x,y])=>vec(x,y,0)), true).getPoints(40).slice(0,-1).map(p=>[p.x,p.y]);
+  const outline = new THREE.CatmullRomCurve3([[0, 0], [-.16, .16], [-.32, .27], [-.28, .36], [-.39, .48], [-.29, .58], [-.33, .7], [-.2, .8], [0, 1], [.2, .8], [.33, .7], [.29, .58], [.39, .48], [.28, .36], [.32, .27], [.16, .16]].map(([x,y])=>vec(x,y,0)), true).getPoints(divisions).slice(0,-1).map(p=>[p.x,p.y]);
   positions.push(0, .52, .08); uvs.push(.5, .52);
   for (const [x, y] of outline) { positions.push(x, y, .08 * Math.sin(y * Math.PI) - Math.abs(x) * .16 + y * y * .13); uvs.push(x + .5, y); }
   for (let i = 0; i < outline.length; i++) indices.push(0, i + 1, (i + 1) % outline.length + 1);
@@ -88,7 +109,9 @@ export function leafGeometry() {
 }
 
 export function leafMaterial() {
-  const map = canvasTexture(128, (ctx, s) => {
+  // Drawn on a 128-unit leaf at twice the density, so veins stay crisp in close-ups.
+  const map = canvasTexture(256, ctx => {
+    const s = 128; ctx.scale(2, 2);
     const gradient = ctx.createLinearGradient(0, 0, s, 0);
     gradient.addColorStop(0, '#bac590'); gradient.addColorStop(.45, '#edf0ce'); gradient.addColorStop(.53, '#d0d8a0'); gradient.addColorStop(1, '#9bb17c');
     ctx.fillStyle = gradient; ctx.fillRect(0, 0, s, s);
@@ -105,5 +128,26 @@ export function leafMaterial() {
   };
   mat.emissive.set('#70844b'); mat.emissiveIntensity = .08;
   mat.customProgramCacheKey = () => 'soft-broadleaf-v2';
+  return mat;
+}
+
+/**
+ * Foliage baked into one geometry per tree: leaf colours live in vertex colours and the broad crown normal in a
+ * vertex attribute. When the baked crown is itself instanced across the globe, the instance rotation turns it too.
+ */
+export function crownMaterial(map: THREE.Texture | null) {
+  const mat = new THREE.MeshStandardMaterial({ color: '#ffffff', map, vertexColors: true, side: THREE.DoubleSide, roughness: .9 });
+  mat.onBeforeCompile = shader => {
+    shader.vertexShader = 'attribute vec3 canopyNormal;\n' + shader.vertexShader;
+    shader.vertexShader = shader.vertexShader.replace('#include <defaultnormal_vertex>', `#include <defaultnormal_vertex>
+      vec3 canopy = canopyNormal;
+      #ifdef USE_INSTANCING
+        canopy = mat3(instanceMatrix) * canopy;
+      #endif
+      transformedNormal = normalize(mix(transformedNormal, normalize(normalMatrix * canopy), 0.78));`);
+    shader.fragmentShader = shader.fragmentShader.replace('#include <normal_fragment_begin>', THREE.ShaderChunk.normal_fragment_begin.replace('normal *= faceDirection;', ''));
+  };
+  mat.emissive.set('#70844b'); mat.emissiveIntensity = .08;
+  mat.customProgramCacheKey = () => 'baked-crown-v1';
   return mat;
 }

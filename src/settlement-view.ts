@@ -5,10 +5,15 @@ import { BUILDINGS, IRRIGATION_RADIUS, type BuildingType, type Direction } from 
 import { ALL_SITES, FORESTS, SITE_BY_ID, directionVector, distanceOnPlanet } from './world-layout';
 import { elevation, landField, NORTH, PLANET_RADIUS, SETTLEMENT_SCALE } from './planet-surface';
 import { type Building, GameSimulation } from './simulation';
+import { SmokePlumes, type SmokeEmitter, type SmokeKind } from './smoke';
+import type { AnimSpec } from './building-kit';
 
 export function onSurface(n:THREE.Vector3,offset=0){return n.clone().multiplyScalar(PLANET_RADIUS+Math.max(0,elevation(n))+offset);}
 function orient(object:THREE.Object3D,n:THREE.Vector3,yaw=0){object.position.copy(onSurface(n));object.quaternion.setFromUnitVectors(NORTH,n);object.rotateY(yaw);object.scale.setScalar(SETTLEMENT_SCALE);}
-interface VisualBuilding {root:THREE.Group; built:boolean; frame?:THREE.Group;}
+interface Animated {node:THREE.Object3D;spec:Required<AnimSpec>;base:number;}
+interface VisualBuilding {root:THREE.Group; built:boolean; frame?:THREE.Group; anims:Animated[]; glows:THREE.Object3D[];}
+/** Facility footprint on the sphere, used to clear decorative trees under buildings. */
+export interface Footprint {direction:Direction;radius:number;}
 interface Actor extends Person {food:THREE.Group;stone:THREE.Group;industry:THREE.Group;}
 
 export class SettlementView {
@@ -25,30 +30,74 @@ export class SettlementView {
   private preview:THREE.Group|null=null;
   private footprint:THREE.Mesh|null=null;
   private previewType:BuildingType|null=null;
+  readonly smoke:SmokePlumes;
+  private active=new Map<string,boolean>();
+  /** Called after facilities change so the scene can keep scenery clear of footprints. */
+  onLayout?:(footprints:Footprint[])=>void;
   constructor(private world:THREE.Group,private game:GameSimulation){
     this.markers=new THREE.InstancedMesh(new THREE.RingGeometry(.17,.2,28),this.markerMaterial,ALL_SITES.length);
-    this.markers.visible=false;this.markers.frustumCulled=false;this.coverage.visible=false;this.world.add(this.markers,this.roads,this.coverage);this.sync();
+    this.markers.visible=false;this.markers.frustumCulled=false;this.coverage.visible=false;this.world.add(this.markers,this.roads,this.coverage);
+    this.smoke=new SmokePlumes(this.world);this.sync();
   }
   get pickables(){return [...this.buildings.values()].map(b=>b.root);}
+  get footprints():Footprint[]{return this.game.buildings.map(b=>({direction:SITE_BY_ID.get(b.siteId)!.direction,radius:BUILDINGS[b.type].radius}));}
   private makeVisual(b:Building){
     const root=new THREE.Group();root.userData.buildingId=b.id;
-    const visual:VisualBuilding={root,built:b.built};
-    if(b.built)root.add(buildingModel(b.type));else{const scaffold=constructionModel(b.type);root.add(scaffold.root);visual.frame=scaffold.frame;}
+    const visual:VisualBuilding={root,built:b.built,anims:[],glows:[]};
+    if(b.built){
+      const model=buildingModel(b.type);root.add(model);
+      model.traverse(o=>{
+        if(o.userData.anim){const spec={type:'spin',axis:'y',speed:1,amount:1,phase:0,always:false,...o.userData.anim} as Required<AnimSpec>;const base=spec.type==='bob'||spec.type==='slide'?o.position[spec.axis]:o.rotation[spec.axis];visual.anims.push({node:o,spec,base});}
+        if(o.userData.activeOnly)visual.glows.push(o);
+      });
+    }else{const scaffold=constructionModel(b.type);root.add(scaffold.root);visual.frame=scaffold.frame;}
     orient(root,directionVector(SITE_BY_ID.get(b.siteId)!.direction),b.yaw);this.world.add(root);this.buildings.set(b.id,visual);
   }
-  sync(){
+  /** Working state drives furnace glow, gears and stacks; homes and concept models are always lived in. */
+  isActive(b:Building){
+    if(!b.built||b.paused)return false;
+    const d=BUILDINGS[b.type];
+    if(d.output)return this.game.productionRate(b)>0;
+    if(b.type==='workshop')return !!this.game.research&&this.game.workersAt(b.id)>0;
+    return true;
+  }
+  /** Chimney markers in planet coordinates; rebuilt only when facilities change. */
+  private collectSmoke(){
+    this.world.updateMatrixWorld(true);
+    const inverse=this.world.matrixWorld.clone().invert(),emitters:SmokeEmitter[]=[],p=new THREE.Vector3();
+    for(const [id,view]of this.buildings){
+      if(!view.built)continue;
+      view.root.traverse(o=>{if(o.name==='smoke'&&o.userData.smoke){p.setFromMatrixPosition(o.matrixWorld).applyMatrix4(inverse);const spec=o.userData.smoke as {kind:SmokeKind;size:number};emitters.push({position:p.clone(),kind:spec.kind,size:spec.size,buildingId:id,seed:(emitters.length*.618)%1});}});
+    }
+    this.smoke.setEmitters(emitters);
+  }
+  /** Rebuilds changed facilities and advances their animations; returns whether anything moved this frame. */
+  sync(time=this.game.elapsed){
     if(this.revision!==this.game.revision){
       for(const [id,view]of this.buildings){const b=this.game.building(id);if(!b||b.built!==view.built){view.root.removeFromParent();if(!view.built)view.root.traverse(o=>{if(o instanceof THREE.Mesh)o.geometry.dispose();});this.buildings.delete(id);}}
       for(const b of this.game.buildings)if(!this.buildings.has(b.id))this.makeVisual(b);
       this.updateRoads();this.revision=this.game.revision;if(this.previewType)this.updateMarkers(this.previewType);
+      this.collectSmoke();
+      this.onLayout?.(this.footprints);
     }
     for(const b of this.game.projects){const view=this.buildings.get(b.id);if(view?.frame)view.frame.scale.y=.3+.7*b.progress/BUILDINGS[b.type].work;}
+    let moving=false;
     for(const b of this.game.buildings){
       const view=this.buildings.get(b.id);if(!view||!b.built)continue;
-      const active=this.game.productionRate(b)>0;
-      const wheel=view.root.getObjectByName('mechanism');if(wheel&&active)wheel.rotation.z=this.game.elapsed*1.8;
-      const glow=view.root.getObjectByName('furnace-glow');if(glow)glow.visible=active;
+      const active=this.isActive(b),concept=!!BUILDINGS[b.type].concept;this.active.set(b.id,active);
+      for(const glow of view.glows)glow.visible=active;
+      for(const {node,spec,base}of view.anims){
+        const always=spec.always||concept;if(!always&&!active)continue;moving=true;
+        const t=(always?time:this.game.elapsed)*spec.speed+spec.phase;
+        if(spec.type==='spin')node.rotation[spec.axis]=base+t;
+        else if(spec.type==='swing')node.rotation[spec.axis]=base+Math.sin(t)*spec.amount;
+        else if(spec.type==='bob')node.position[spec.axis]=base+Math.sin(t)*spec.amount;
+        else if(spec.type==='slide')node.position[spec.axis]=base+(.5-.5*Math.cos(t))*spec.amount;
+        else if(spec.type==='blink')node.visible=Math.sin(t)>.2;
+        else if(spec.type==='pulse')node.scale.setScalar(1+Math.sin(t)*.06*spec.amount);
+      }
     }
+    if(this.smoke.update(time,id=>this.active.get(id)??false))moving=true;
     for(const citizen of this.game.people){
       if(!this.actors.has(citizen.id)){
         const person=makePerson(citizen.id) as Actor;person.food=foodCargo();person.food.position.set(0,.32,.17);person.body.add(person.food);
@@ -56,6 +105,7 @@ export class SettlementView {
       }
       this.animateCitizen(citizen.id);
     }
+    return moving;
   }
   private animateCitizen(id:number){
     const p=this.game.people.find(p=>p.id===id)!,actor=this.actors.get(id)!;
