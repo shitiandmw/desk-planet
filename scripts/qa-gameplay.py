@@ -10,7 +10,7 @@ from pathlib import Path
 
 parser=argparse.ArgumentParser()
 parser.add_argument('--session', default=f'planet-qa-{os.getpid()}')
-parser.add_argument('--url', default='http://localhost:5187')
+parser.add_argument('--url', default='http://localhost:5187/?classic')
 parser.add_argument('--report', default='/tmp/planet-ui-playthrough.json')
 parser.add_argument('--fresh', action='store_true')
 parser.add_argument('--keep-browser', action='store_true')

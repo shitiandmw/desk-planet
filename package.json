@@ -1,26 +1,80 @@
 {
   "name": "woodland-diorama",
-  "version": "0.2.0",
+  "version": "0.2.6",
   "private": true,
   "type": "module",
+  "main": "desktop/main.cjs",
+  "description": "微缩星球：陪伴工作的透明桌面小游戏",
+  "author": "Mini Planet",
   "scripts": {
     "dev": "vite --host 0.0.0.0 --port 5187 --strictPort",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview --host 0.0.0.0 --port 4173 --strictPort",
-    "test": "tsx --test src/*.test.ts",
+    "test": "tsx --test src/*.test.ts desktop/*.test.cjs",
+    "desktop": "npm run build && electron .",
+    "desktop:dev": "PLANET_DEV_URL=http://localhost:5187 electron .",
+    "package:desktop": "npm run build && electron-builder --dir",
+    "package:mac": "npm run build && electron-builder --mac zip --arm64",
+    "package:win": "npm run build && electron-builder --win portable --x64",
     "package:demo": "npm run build && node scripts/package-demo.mjs",
     "balance": "tsx scripts/balance-playthrough.ts",
     "qa:gameplay": "python3 scripts/qa-gameplay.py",
+    "qa:companion": "python3 scripts/qa-companion.py",
     "stage:stable": "node scripts/stage-stable.mjs"
+  },
+  "build": {
+    "appId": "com.miniplanet.companion",
+    "productName": "微缩星球",
+    "artifactName": "Mini-Planet-${version}-${os}-${arch}.${ext}",
+    "directories": {
+      "output": "output/desktop"
+    },
+    "files": [
+      "dist/**/*",
+      "desktop/main.cjs",
+      "desktop/preload.cjs",
+      "desktop/hit-regions.cjs",
+      "desktop/tray.png",
+      "!node_modules/**"
+    ],
+    "extraResources": [
+      {
+        "from": "node_modules/three/LICENSE",
+        "to": "licenses/three.txt"
+      }
+    ],
+    "mac": {
+      "target": [
+        "zip"
+      ],
+      "category": "public.app-category.games",
+      "icon": "desktop/icon.icns",
+      "identity": "-"
+    },
+    "win": {
+      "target": [
+        "portable"
+      ],
+      "icon": "desktop/icon.png"
+    },
+    "linux": {
+      "target": [
+        "AppImage"
+      ],
+      "category": "Game",
+      "icon": "desktop/icon.png"
+    }
   },
   "dependencies": {
     "three": "^0.180.0"
   },
   "devDependencies": {
+    "@types/node": "^22.18.0",
     "@types/three": "^0.180.0",
-    "typescript": "^5.9.3",
-    "vite": "^7.1.7",
+    "electron": "^44.9.2",
+    "electron-builder": "^26.15.3",
     "tsx": "^4.20.6",
-    "@types/node": "^22.18.0"
+    "typescript": "^5.9.3",
+    "vite": "^7.1.7"
   }
 }

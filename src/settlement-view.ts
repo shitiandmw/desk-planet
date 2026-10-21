@@ -7,6 +7,7 @@ import { elevation, landField, NORTH, PLANET_RADIUS, SETTLEMENT_SCALE } from './
 import { type Building, GameSimulation } from './simulation';
 import { SmokePlumes, type SmokeEmitter, type SmokeKind } from './smoke';
 import type { AnimSpec } from './building-kit';
+import { radialExtent } from './companion-framing';
 
 export function onSurface(n:THREE.Vector3,offset=0){return n.clone().multiplyScalar(PLANET_RADIUS+Math.max(0,elevation(n))+offset);}
 function orient(object:THREE.Object3D,n:THREE.Vector3,yaw=0){object.position.copy(onSurface(n));object.quaternion.setFromUnitVectors(NORTH,n);object.rotateY(yaw);object.scale.setScalar(SETTLEMENT_SCALE);}
@@ -40,6 +41,24 @@ export class SettlementView {
     this.smoke=new SmokePlumes(this.world);this.sync();
   }
   get pickables(){return [...this.buildings.values()].map(b=>b.root);}
+  /** Stable over rotation, and includes both ends of the elevator cars' travel. Recomputed only after layout changes. */
+  get framingRadius(){
+    let radius=0;
+    for(const view of this.buildings.values()){
+      radius=Math.max(radius,radialExtent(view.root));
+      for(const {node,spec,base} of view.anims){
+        if(spec.type!=='slide'&&spec.type!=='bob')continue;
+        const axis=new THREE.Vector3().setComponent({x:0,y:1,z:2}[spec.axis],1);
+        const parent=node.parent!.matrixWorld;
+        axis.applyMatrix4(parent).sub(new THREE.Vector3().setFromMatrixPosition(parent));
+        for(const end of [spec.type==='bob'?base-spec.amount:base,base+spec.amount]){
+          radius=Math.max(radius,radialExtent(node,axis.clone().multiplyScalar(end-node.position[spec.axis])));
+        }
+      }
+    }
+    if(this.preview)radius=Math.max(radius,radialExtent(this.preview));
+    return radius;
+  }
   get footprints():Footprint[]{return this.game.buildings.map(b=>({direction:SITE_BY_ID.get(b.siteId)!.direction,radius:BUILDINGS[b.type].radius}));}
   private makeVisual(b:Building){
     const root=new THREE.Group();root.userData.buildingId=b.id;

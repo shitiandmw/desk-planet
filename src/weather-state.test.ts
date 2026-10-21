@@ -28,6 +28,19 @@ test('automatic weather includes clear, gathering clouds, rain, and recovery', (
 
 test('fixed cloudy mode remains rain-free across multiple automatic cycles', () => {
   const state = new WeatherState(); state.setMode('cloudy');
-  for (let i = 0; i < 250; i++) state.update(1);
+  for (let i = 0; i < WEATHER_CYCLE_SECONDS*3; i++) state.update(1);
   assert.equal(state.rain, 0); assert.ok(state.cloudiness > .7);
+});
+
+test('automatic weather develops over minutes without abrupt cloud or rain changes', () => {
+  const state=new WeatherState();let rainySeconds=0;
+  for(let i=0;i<WEATHER_CYCLE_SECONDS*2;i++) {
+    const cloudiness=state.cloudiness,rain=state.rain;
+    state.update(1);
+    assert.ok(Math.abs(state.cloudiness-cloudiness)<.025);
+    assert.ok(Math.abs(state.rain-rain)<.08);
+    if(i<80)assert.ok(state.cloudiness<.2 && state.rain===0);
+    if(state.rain>.5)rainySeconds++;
+  }
+  assert.ok(rainySeconds>100 && rainySeconds<180);
 });

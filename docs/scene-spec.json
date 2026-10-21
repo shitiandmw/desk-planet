@@ -112,7 +112,9 @@
     "cloud_geometry": "continuous implicit surface meshes",
     "transparent_cloud_sprites": 0,
     "raindrops": 560,
-    "automatic_cycle_seconds": 90,
+    "automatic_cycle_seconds": 360,
+    "cloud_motion": "shared prevailing wind with different drift speeds and staggered 222–286 second lifecycles",
+    "rain_ownership": "per-cloud rain and splash intensity, fixed particle buffers",
     "modes": [
       "auto",
       "clear",

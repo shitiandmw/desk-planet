@@ -5,6 +5,8 @@ import { SITE_BY_ID, directionVector } from './world-layout';
 import { buildAllEras, buildEra, clearSandbox, eraProgress, ERA_DISTRICTS } from './sandbox';
 import { WoodlandScene, type ViewName } from './scene';
 import type { WeatherMode } from './weather-state';
+import { COMPANION, desktop } from './desktop';
+import { PlanetCompanion } from './companion';
 
 const icons: Record<string,string> = {
   well:'<path d="M5 12h14v9H5ZM4 6l8-4 8 4M6 6v6m12-6v6m-8-5h6m-3 0v7"/>',
@@ -78,14 +80,15 @@ const counter=(kind:string,label:string)=>`<div class="counter"><button data-act
 /** `?test` opens a separate test planet: every model of every era, free and instant, saved under its own key. */
 const SANDBOX=new URLSearchParams(location.search).has('test');
 const STORAGE=SANDBOX?'mini-planet-game-v1-sandbox':'mini-planet-game-v1';
-const modeURL=(test:boolean)=>{const url=new URL(location.href);url.search=test?'?test':'';url.hash='';return url.href;};
+const modeURL=(test:boolean)=>{const url=new URL(location.href);if(test)url.searchParams.set('test','');else url.searchParams.delete('test');url.hash='';return url.href;};
 let sim=SANDBOX?GameSimulation.createSandbox():new GameSimulation(),restored=false,storageFailed=false,invalidSave=false;
 try{const raw=localStorage.getItem(STORAGE);if(raw){let parsed:unknown;try{parsed=JSON.parse(raw);}catch{invalidSave=true;}const saved=GameSimulation.load(parsed,{sandbox:SANDBOX});if(saved){sim=saved;restored=true;if(!SANDBOX&&(parsed as {version:number}).version===1&&!localStorage.getItem(STORAGE+'-v1-backup'))localStorage.setItem(STORAGE+'-v1-backup',raw);}else if(!SANDBOX){invalidSave=true;localStorage.setItem(STORAGE+'-unreadable-backup',raw);}}}catch{storageFailed=true;}
 let scene:WoodlandScene,panel:'overview'|'catalog'|'building'|'research'|'placement'|'economy'='overview';
+let companion:PlanetCompanion|undefined;
 let restarting=false,selectedResource:Resource='food',catalogCategory='all',lastChapter=-1;
 let selected:string|null=null,panelKey='',toastTimer=0,lastRender=0,lastSave=0,lastEvent=0,warm=false;
 function save(){if(restarting)return;try{localStorage.setItem(STORAGE,JSON.stringify(sim.save()));storageFailed=false;lastSave=performance.now();}catch{storageFailed=true;}setText('save-status',storageFailed?'浏览器未允许保存':SANDBOX?'测试星球已单独保存':'已保存到此浏览器');}
-function toast(message:string){$('toast').textContent=message;$('toast').classList.add('visible');clearTimeout(toastTimer);toastTimer=window.setTimeout(()=>$('toast').classList.remove('visible'),3600);}
+function toast(message:string){if(COMPANION&&!companion?.visible)return;$('toast').textContent=message;$('toast').classList.add('visible');clearTimeout(toastTimer);toastTimer=window.setTimeout(()=>$('toast').classList.remove('visible'),3600);}
 function setText(id:string,text:string){const el=$(id);if(el&&el.textContent!==text)el.textContent=text;}
 function disable(id:string,value:boolean){$(id)?.toggleAttribute('disabled',value);}
 function progress(id:string,percent:number){const el=$(id);if(el)el.style.width=`${Math.max(0,Math.min(100,percent))}%`;}
@@ -144,16 +147,17 @@ $('app').innerHTML=`
 <dt>人手</dt><dd>所有设施共用居民。新设施建成后，点击它分配岗位；提高优先级可以调配人手。食物岗位默认优先。</dd>
 <dt>生活</dt><dd>居民持续消耗食物。住房有空位、储粮至少 12 且食物产能有盈余时，每 35 游戏秒接纳一位新居民，消耗 6 份食物。</dd>
 <dt>建设与研究</dt><dd>确认时预留材料，施工和研究逐步消耗；取消会返还未使用部分。建造工共用，按队列施工。</dd>
-<dt>产业</dt><dd>点击顶部资源查看来源和消耗。加工设施缺料时停工，完成一轮后扣除原料。目标库存达到后停止生产，库存降低后恢复。</dd><dt>农业</dt><dd>水井覆盖附近农田，产量 +25%；粮仓增加 160 食物容量。同一农田不叠加多口井的收益。</dd><dt>节奏与存档</dt><dd>暂停和倍速同时控制建设、生产、消费与迁入。切到后台暂停推进，关闭后没有离线收益；进度只保存在当前浏览器。</dd>
-<dt>天气与观察</dt><dd>拖动球体，滚轮或双指缩放。天气自然交替，也可手动选择；天气目前不影响产量。点击建筑后选「近景查看」可以凑近看模型。</dd>
+<dt>产业</dt><dd>点击资源查看来源和消耗。加工设施缺料时停工，完成一轮后扣除原料。目标库存达到后停止生产，库存降低后恢复。</dd><dt>农业</dt><dd>水井覆盖附近农田，产量 +25%；粮仓增加 160 食物容量。同一农田不叠加多口井的收益。</dd><dt>节奏与存档</dt><dd>暂停和倍速同时控制建设、生产、消费与迁入。${desktop?'工作时星球继续生长，隐藏或退出后停止。进度保存在本机，关闭后没有离线收益。':'切到其他标签页暂停推进，关闭后没有离线收益；进度保存在当前浏览器。'}</dd>
+<dt>天气与观察</dt><dd>${COMPANION?'直接拖动旋转球体，滚轮平滑缩放，Shift ＋ 拖动移动位置。点击星球展开面板；Esc 或回到工作软件收起。':'拖动球体，滚轮或双指缩放。点击建筑后选「近景查看」可以凑近看模型。'}天气自然交替，也可手动选择；天气目前不影响产量。</dd>
 <dt>测试模式</dt><dd>${SANDBOX?'当前是测试星球：全部建筑免费、立即建成，可以随时移除；进度与正式聚落分开保存。':'在独立的测试星球上一键建造六个时代的全部建筑，查看模型与动画；不会改动当前聚落。'}</dd>
 </dl><div class="help-actions">${button('auto-rotate','星球自转')}${button('wind','树冠微风')}${SANDBOX?`${button('sandbox-clear','清空测试建筑')}${button('sandbox-exit','退出测试模式','primary')}`:`${button('enter-test','进入测试模式')}${button('export-save','导出存档')}${button('import-save','导入存档')}<button class="secondary" id="restore-save" data-action="restore-save" hidden>撤销上次导入</button>${button('reset-request','重新开始','danger')}`}</div><p class="note" id="help-save"></p>${button('close-help','回到聚落','primary full')}</dialog>
 <input id="save-file" type="file" accept=".json,application/json" aria-label="选择聚落存档" hidden>
 <dialog id="reset-dialog" aria-labelledby="reset-title"><div class="eyebrow">A NEW BEGINNING</div><h2 id="reset-title">重新安家？</h2><p>当前浏览器中的聚落进度会被替换，回到六位居民的开局。</p><div class="actions">${button('reset-cancel','保留聚落')}${button('reset-confirm','重新开始','danger')}</div></dialog>
 `;
 for(const [action,label]of [['light','切换晨光与夕照'],['photo','保存场景图片'],['help','操作说明']])document.querySelector(`[data-action="${action}"]`)?.setAttribute('aria-label',label);
+if(COMPANION)companion=new PlanetCompanion(icon,()=>{if(scene?.preview)scene.cancelBuild();});
 
-function showPanel(next:typeof panel){panel=next;$('management').hidden=false;$('panel-reopen').hidden=true;updateUI(true);}
+function showPanel(next:typeof panel){panel=next;companion?.showManagement();$('management').hidden=false;$('panel-reopen').hidden=true;updateUI(true);}
 function openPanel(next:typeof panel){if(next!=='placement'&&scene.preview)scene.cancelBuild();showPanel(next);}
 function build(type:BuildingType){scene.beginBuild(type);showPanel('placement');}
 function renderPanel(){
@@ -231,6 +235,7 @@ function renderPanel(){
 
 function updateUI(force=false){
   if(!scene)return;if(!force&&performance.now()-lastRender<200)return;lastRender=performance.now();if(force)scene.invalidate();renderPanel();
+  companion?.updateStatus(sim.population,sim.paused,sim.speed);
   $('interface').classList.toggle('inspecting',scene.camera.position.length()<32);
   const industry=sim.technologies.includes('metallurgy')||INDUSTRY_RESOURCES.some(r=>sim.resources[r]>0);$('industry-stock').hidden=!industry;$('interface').classList.toggle('has-industry',industry);
   const rates=sim.potentialRates;
@@ -360,7 +365,7 @@ function handleAction(action:string){
     case 'export-save':exportSave();break;
     case 'import-save':$('save-file').click();break;
     case 'restore-save':try{const loaded=GameSimulation.load(JSON.parse(localStorage.getItem(STORAGE+'-before-import')||'null'));if(!loaded){toast('没有可恢复的导入前存档');break;}localStorage.setItem(STORAGE+'-before-restore',JSON.stringify(sim.save()));localStorage.setItem(STORAGE,JSON.stringify(loaded.save()));localStorage.removeItem(STORAGE+'-before-import');restarting=true;location.reload();}catch{toast('恢复失败，当前聚落未改变。');}return;
-    case 'close-panel':$('management').hidden=true;$('panel-reopen').hidden=false;break;
+    case 'close-panel':if(companion){if(scene.preview)scene.cancelBuild();companion.closeSheet();}else{$('management').hidden=true;$('panel-reopen').hidden=false;}break;
     case 'planet':case 'grove':case 'back':goView(action);break;
     case 'goal':goalAction();break;
     case 'food-help':foodHelp();break;
@@ -373,7 +378,7 @@ function handleAction(action:string){
     case 'growth':sim.growthEnabled=!sim.growthEnabled;break;
     case 'cancel-construction':if(b){act(sim.cancelConstruction(b.id));scene.selectBuilding(null);showPanel('overview');}break;
     case 'focus':if(b)scene.focusBuilding(b.id);break;
-    case 'inspect':if(b)scene.inspectBuilding(b.id);break;
+    case 'inspect':if(b){scene.inspectBuilding(b.id);companion?.enlarge();}break;
     case 'remove-building':if(b){const result=sim.removeBuilding(b.id);if(result.ok){scene.selectBuilding(null);showPanel('overview');}else toast(result.reason);}break;
     case 'sandbox-all':{if(scene.preview)scene.cancelBuild();$<HTMLDialogElement>('help-dialog').close();const report=buildAllEras(sim);scene.setView('planet');toast(report.built.length?`已建成 ${report.built.length} 座建筑${report.skipped.length?`，${report.skipped.length} 座没有找到空地`:''}；拖动星球查看各个时代`:'全部建筑都已在星球上');break;}
     case 'sandbox-clear':{if(scene.preview)scene.cancelBuild();$<HTMLDialogElement>('help-dialog').close();const removed=clearSandbox(sim);scene.selectBuilding(null);showPanel('overview');toast(removed?`已移除 ${removed} 座测试建筑`:'没有可以移除的测试建筑');break;}
@@ -402,10 +407,17 @@ function handleAction(action:string){
 
 requestAnimationFrame(()=>setTimeout(()=>{
   try{
-    scene=new WoodlandScene($('world'),sim);
-    scene.onSelect=id=>{selected=id;if(!scene.preview)showPanel(id?'building':'overview');};
+    scene=new WoodlandScene($('world'),sim,COMPANION);
+    scene.onSelect=id=>{selected=id;if(!scene.preview&&(id||!COMPANION))showPanel(id?'building':'overview');};
     scene.onPreview=()=>{if(scene.preview)showPanel('placement');};
     scene.onFrame=()=>updateUI();
+    companion?.attach(scene);
+    desktop?.onCommand(command=>{
+      if(command==='dismiss')companion?.dismiss();
+      if(command==='reset')companion?.reset();
+      if(command==='pause')handleAction('pause');
+      if(command==='save')save();
+    });
     document.addEventListener('click',event=>{
       const target=(event.target as HTMLElement).closest<HTMLButtonElement>('button');if(!target||target.disabled)return;
       if(target.dataset.action)handleAction(target.dataset.action);
@@ -431,11 +443,11 @@ requestAnimationFrame(()=>setTimeout(()=>{
       }catch{toast('无法导入此存档，当前聚落进度已保留。');input.value='';}
     });
     document.addEventListener('pointerdown',event=>{if(!(event.target as HTMLElement).closest('.weather-dock')){$('weather-menu').hidden=true;$('weather-toggle').setAttribute('aria-expanded','false');}});
-    document.addEventListener('keydown',event=>{if(document.querySelector('dialog[open]'))return;if(event.key==='Escape'){if(scene.preview){scene.cancelBuild();showPanel('catalog');}$('weather-menu').hidden=true;$('weather-toggle').setAttribute('aria-expanded','false');}if(event.key.toLowerCase()==='r'&&scene.preview&&!(event.target instanceof HTMLInputElement)){scene.rotatePreview();updateUI(true);}});
+    document.addEventListener('keydown',event=>{if(document.querySelector('dialog[open]'))return;if(event.key==='Escape'){if(scene.preview){scene.cancelBuild();showPanel('catalog');}else companion?.dismiss();$('weather-menu').hidden=true;$('weather-toggle').setAttribute('aria-expanded','false');}if(event.key.toLowerCase()==='r'&&scene.preview&&!(event.target instanceof HTMLInputElement)){scene.rotatePreview();updateUI(true);}});
     window.addEventListener('pagehide',save);document.addEventListener('visibilitychange',()=>{if(document.hidden)save();});
     Object.assign(window,{__PLANET_GAME__:{scene,simulation:sim,ready:true},__WOODLAND__:{scene,simulation:sim,ready:true}});
     $('loading').classList.add('loaded');setTimeout(()=>$('loading').remove(),600);updateUI(true);
     if(SANDBOX)toast(restored?'已恢复测试星球':'测试模式：点击「一键建造全部时代」查看所有建筑');
     else if(restored)toast('欢迎回来，聚落进度已恢复');else if(invalidSave)toast('旧存档无法读取，已保留副本并开启新聚落');
-  }catch(error){console.error(error);$('loading').innerHTML=`${icon('tree',40)}<h2>暂时无法打开三维场景</h2><p>请使用支持 WebGL 2 的浏览器，并开启硬件加速。</p><button class="primary" id="retry">重新加载</button>`;$('retry').addEventListener('click',()=>location.reload());}
+  }catch(error){console.error(error);$('loading').classList.add('failed');$('loading').innerHTML=`${icon('tree',40)}<h2>暂时无法打开三维场景</h2><p>请使用支持 WebGL 2 的浏览器，并开启硬件加速。</p><button class="primary" id="retry">重新加载</button>`;$('retry').addEventListener('click',()=>location.reload());}
 },60));

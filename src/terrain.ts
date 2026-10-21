@@ -55,7 +55,7 @@ export function makeTerrain(parent: THREE.Object3D, renderer: THREE.WebGLRendere
   const bakedField = bakePlanetField(renderer);
   const groundUniforms = { uSand: { value: new THREE.Color('#e4d6a6') }, uWetSand: { value: new THREE.Color('#c6b484') }, uPlanetField: { value: bakedField.texture } };
   groundMaterial.onBeforeCompile = shader => {
-    Object.assign(shader.uniforms, groundUniforms, { uCloudShadows: cloudShadows });
+    Object.assign(shader.uniforms, groundUniforms, { uCloudShadows: cloudShadows, uCloudShadowRadii: cloudShadows.radii });
     shader.vertexShader = 'varying vec3 vGroundDirection;\n' + shader.vertexShader;
     shader.vertexShader = shader.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\nvGroundDirection = normalize(position);');
     shader.fragmentShader = 'varying vec3 vGroundDirection;\nuniform vec3 uSand; uniform vec3 uWetSand;\n' + cloudShadowGLSL + planetFieldSampleGLSL + shader.fragmentShader;

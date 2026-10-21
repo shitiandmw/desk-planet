@@ -1,0 +1,73 @@
+/* The same small canvas works on a transparent desktop or a quiet browser preview. */
+html.companion { background: #eeede4; width: 100%; height: 100%; }
+html.companion:has(.native-desktop), body.companion.native-desktop { background: transparent; }
+.companion #world { inset: auto; touch-action: none; }
+.companion #world canvas { outline: none; }
+.companion #world:has(canvas:focus-visible) { border-radius: 50%; outline: 1px solid #77907180; outline-offset: -36px; }
+.companion .ui > :not(#companion-shell):not(#companion-body) { display: none !important; }
+.companion #loading { background: transparent; pointer-events: none; }
+.companion #loading:not(.failed) > * { display: none; }
+.companion #loading.failed { pointer-events: auto; inset: 15% auto auto 50%; transform: translateX(-50%); padding: 24px; border-radius: 18px; background: #f4f6efee; max-width: 90vw; text-align: center; }
+
+#companion-shell, #companion-body {
+  position: fixed; display: flex; flex-direction: column; pointer-events: auto;
+  border: 1px solid #ffffff99; border-radius: 20px; padding: 13px;
+  background: linear-gradient(145deg, #f8faf0d9, #e9eee1c7);
+  color: #3d5241; box-shadow: 0 12px 38px #18322616, inset 0 1px 0 #ffffffa8;
+  backdrop-filter: blur(22px) saturate(1.2); -webkit-backdrop-filter: blur(22px) saturate(1.2);
+  animation: companion-appear .2s ease-out; overflow: hidden;
+}
+@keyframes companion-appear { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; transform: translateY(0); } }
+.companion-heading { display: flex; align-items: center; gap: 9px; padding: 0 3px 10px; flex-shrink: 0; }
+.companion-mark { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; background: #6e8b6a15; color: #698562; }
+.companion-heading strong { display: block; font-size: 12px; font-weight: 600; letter-spacing: .12em; }
+#companion-status { display: block; margin-top: 3px; font-size: 9px; color: #7a8975; letter-spacing: .025em; }
+.companion-collapse { margin-left: auto; display: grid; place-items: center; width: 26px; height: 26px; border: 0; border-radius: 50%; background: transparent; color: #80907a; }
+.companion-collapse:hover { background: #667e5d15; }
+.companion-nav { display: flex; gap: 5px; flex-shrink: 0; }
+.companion-nav > button { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 9px 0 8px; border: 0; background: #ffffff3b; border-radius: 10px; font-size: 10px; color: #667b5c; }
+.companion-nav > button:hover { background: #ffffff90; }
+.companion-nav > button.active { background: #5c7657; color: #f4f7ec; }
+#companion-body { overflow-y: auto; display: block; padding: 16px; min-height: 0; scrollbar-width: thin; scrollbar-color: #b7c5ad transparent; margin-top: 0; }
+.companion-section-heading { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; font-size: 12px; font-weight: 600; }
+.companion-instructions, .companion-save-note { font-size: 10px; color: #7b8b72; line-height: 1.9; margin: 6px 0 13px; }
+.companion-save-note { margin: 14px 0 0; }
+.companion-setting { display: flex; align-items: center; justify-content: space-between; gap: 5px; padding: 10px 0; border-bottom: 1px solid #9cac8e1f; font-size: 11px; }
+.companion-tool-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; margin-top: 12px; }
+.companion-tool-grid > button { display: flex; align-items: center; gap: 6px; font-size: 10px; border: 1px solid #fafff0a6; border-radius: 8px; padding: 10px 8px; background: #fbfff466; }
+.companion-tool-grid > button[aria-pressed=true] { background: #d9e4cf; }
+.companion :is(#companion-shell, #companion-body) .management { position: static; width: 100%; max-height: none; background: transparent; border: 0; border-radius: 0; box-shadow: none; padding: 10px 1px 0; backdrop-filter: none; overflow: visible; }
+.companion #panel-content { overflow: visible; }
+.companion .management h2 { font-size: 22px; }
+.companion #placement-actions { position: sticky; bottom: -1px; padding-bottom: 4px; background: #edf3e8ed; border-radius: 8px; backdrop-filter: blur(12px); }
+.companion :is(#companion-shell, #companion-body) .resources { position: static; display: grid; grid-template-columns: 1fr 1fr; gap: 7px; background: transparent; box-shadow: none; border: 0; padding: 0; }
+.companion :is(#companion-shell, #companion-body) .resource { flex: none; min-width: 0; border: 1px solid #ffffff60; border-radius: 9px; padding: 8px; background: #ffffff40; gap: 6px; }
+.companion :is(#companion-shell, #companion-body) .resource strong { font-size: 17px; }
+.companion :is(#companion-shell, #companion-body) .resource-name { font-size: 9px; }
+.companion :is(#companion-shell, #companion-body) .resource .rate { position: static; transform: none; font-size: 8px; margin-left: auto; }
+.companion :is(#companion-shell, #companion-body) .resource > svg { width: 16px; }
+.companion :is(#companion-shell, #companion-body) .industry-stock { position: static; transform: none; margin-top: 7px; display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
+.companion :is(#companion-shell, #companion-body) .industry-stock > button { padding: 7px; font-size: 9px; background: #ffffff40; }
+.companion :is(#companion-shell, #companion-body) .industry-stock small { display: none; }
+.companion :is(#companion-shell, #companion-body) .journey { position: static; width: 100%; background: none; padding: 0; border: 0; box-shadow: none; backdrop-filter: none; }
+.companion :is(#companion-shell, #companion-body) .journey h1 { display: block; font-size: 22px; margin: 14px 0; }
+.companion :is(#companion-shell, #companion-body) .journey .eyebrow, .companion :is(#companion-shell, #companion-body) .journey-intro, .companion :is(#companion-shell, #companion-body) .goals, .companion :is(#companion-shell, #companion-body) .era-list, .companion :is(#companion-shell, #companion-body) .sandbox-links, .companion :is(#companion-shell, #companion-body) .chapter-foot { display: block; }
+.companion :is(#companion-shell, #companion-body) .journey-intro { font-size: 11px; margin-bottom: 16px; }
+.companion :is(#companion-shell, #companion-body) .goal { padding: 12px 0; }
+.companion :is(#companion-shell, #companion-body) .goal p { display: block; font-size: 10px; }
+.companion :is(#companion-shell, #companion-body) .goal-action { max-width: none; width: 100%; font-size: 11px; margin: 10px 0; }
+.companion :is(#companion-shell, #companion-body) .weather-dock { position: static; }
+.companion :is(#companion-shell, #companion-body) .weather-dock > button { padding: 7px 9px; font-size: 10px; background: #ffffff60; }
+.companion :is(#companion-shell, #companion-body) #weather-menu { position: static; width: 160px; margin-top: 5px; box-shadow: none; }
+.companion :is(#companion-shell, #companion-body) .time-controls, .companion :is(#companion-shell, #companion-body) .view-controls { position: static; display: flex; padding: 3px; border-radius: 8px; background: #ffffff50; box-shadow: none; backdrop-filter: none; gap: 1px; }
+.companion :is(#companion-shell, #companion-body) .time-controls button { width: 29px; height: 30px; min-width: 29px; font-size: 10px; }
+.companion :is(#companion-shell, #companion-body) .view { font-size: 10px; padding: 7px; }
+.companion :is(#companion-shell, #companion-body) .food-alert { position: static; transform: none; max-width: none; font-size: 10px; margin-top: 12px; padding: 8px; }
+.companion :is(#companion-shell, #companion-body) .catalog, .companion :is(#companion-shell, #companion-body) .research-list, .companion :is(#companion-shell, #companion-body) .facility-list { display: flex; flex-direction: column; }
+.companion :is(#companion-shell, #companion-body) .build-card { flex-wrap: nowrap; }
+.companion :is(#companion-shell, #companion-body) .build-state { width: auto; max-width: 65px; }
+.companion #toast { bottom: 18px; width: max-content; max-width: min(340px, 90vw); font-size: 11px; }
+.companion dialog { background: #f4f7edd9; backdrop-filter: blur(24px); }
+.companion dialog::backdrop { background: #22302012; backdrop-filter: none; }
+
+#companion-body:not([data-sheet=management]) .food-alert { display: none !important; }

@@ -37,6 +37,7 @@ varying vec3 vOceanZ;
  * are only evaluated in the shallow band where they can be seen.
  */
 export class Ocean {
+  reflectionStrength = 1;
   mesh: THREE.Mesh<THREE.SphereGeometry, THREE.MeshPhysicalMaterial>;
   uniforms = {
     uOceanTime: { value: 0 }, uRain: { value: 0 },
@@ -75,7 +76,7 @@ export class Ocean {
       envMap: this.reflection.texture, envMapIntensity: 1.0,
     });
     material.onBeforeCompile = shader => {
-      Object.assign(shader.uniforms, this.uniforms, { uCloudShadows: cloudShadows });
+      Object.assign(shader.uniforms, this.uniforms, { uCloudShadows: cloudShadows, uCloudShadowRadii: cloudShadows.radii });
       shader.vertexShader = `${oceanVaryings}\n${waveGLSL}\n${planetFieldSampleGLSL}\n` + shader.vertexShader;
       shader.vertexShader = shader.vertexShader.replace('#include <begin_vertex>', `
         #include <begin_vertex>
@@ -150,7 +151,7 @@ export class Ocean {
   update(time: number, rain: number, cloudiness: number) {
     this.uniforms.uOceanTime.value = time; this.uniforms.uRain.value = rain;
     this.mesh.material.roughness = .12 + rain * .16;
-    this.mesh.material.envMapIntensity = .95 - cloudiness * .3;
+    this.mesh.material.envMapIntensity = (.95 - cloudiness * .3) * this.reflectionStrength;
   }
 
   dispose() { this.reflection.dispose(); this.mesh.geometry.dispose(); this.mesh.material.dispose(); }
