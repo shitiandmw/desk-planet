@@ -636,5 +636,5 @@ export function boulderGeometry(seed: number, detail = 2, moss = 0) {
   g.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3)); g.userData.bakedShade = true;
   return g;
 }
-/** Rock for scattered instances: per-vertex baked shading times a per-instance colour. */
-export const rockMaterial = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: .93, flatShading: true });
+/** Rock for scattered instances: per-vertex baked shading times a per-instance colour, weathered per pixel. */
+export { rockMaterial } from './rock-material';
