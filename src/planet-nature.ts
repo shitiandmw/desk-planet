@@ -63,7 +63,7 @@ export function makePlanetNature(parent: THREE.Object3D, scenery: SceneryClearan
     rocks[k].setColorAt(counts[k]++, stone[Math.floor(random() * stone.length)].clone().multiplyScalar(.9 + random() * .14));
   }
   // Rocks in the shallows, in twos and threes: some break the surface, some lie just under it. Through the clear water
-  // their sides, the caustics on them and their shadows on the bed show how deep it is. The tops weather to algae.
+  // their sides, the caustics on them and their shadows on the bed show how deep it is.
   const shallows: THREE.Vector3[] = [];
   for (let i = 0; i < 9000 && shallows.length < 13; i++) {
     const index = (i * 2113) % 9000, y = 1 - 2 * (index + .5) / 9000, a = index * 2.399963;

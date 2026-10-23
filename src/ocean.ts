@@ -5,26 +5,8 @@ import { PLANET_RADIUS } from './planet-surface';
 import { planetFieldSampleGLSL } from './planet-field-texture';
 import { detailVolumeGLSL } from './detail-volume';
 import { SEABED_FADE, SEABED_RAY_REACH, shoreGLSL } from './shore';
+import { oceanWavesGLSL } from './ocean-waves';
 
-const waveGLSL = `
-uniform float uOceanTime;
-uniform float uRain;
-vec3 swellA = normalize(vec3(0.12,0.95,0.30));
-vec3 swellB = normalize(vec3(-0.45,0.18,0.87));
-vec3 swellC = normalize(vec3(0.72,0.55,-0.42));
-float oceanHeight(vec3 p) {
-  float warp = sin(dot(p,swellB)*1.3+uOceanTime*.12)*1.2+sin(dot(p,swellC)*.8)*1.8;
-  return (sin(dot(p,swellA)*4.5-uOceanTime*1.15+warp)*0.008
-    +sin(dot(p,swellB)*8.2-uOceanTime*1.8+warp)*0.0035
-    +sin(dot(p,swellC)*23.0+uOceanTime*2.1+warp)*0.0018)*(1.0+uRain*0.65);
-}
-vec3 oceanGradient(vec3 p) {
-  float warp = sin(dot(p,swellB)*1.3+uOceanTime*.12)*1.2+sin(dot(p,swellC)*.8)*1.8;
-  return (swellA*cos(dot(p,swellA)*4.5-uOceanTime*1.15+warp)*0.036
-    +swellB*cos(dot(p,swellB)*8.2-uOceanTime*1.8+warp)*0.0287
-    +swellC*cos(dot(p,swellC)*23.0+uOceanTime*2.1+warp)*0.0414)*(1.0+uRain*0.65);
-}
-`;
 const oceanVaryings = `
 varying vec3 vOceanPoint;
 varying vec3 vOceanX;
@@ -89,7 +71,7 @@ export class Ocean {
     });
     material.onBeforeCompile = shader => {
       Object.assign(shader.uniforms, this.uniforms, { uCloudShadows: cloudShadows, uCloudShadowRadii: cloudShadows.radii });
-      shader.vertexShader = `${oceanVaryings}\n${waveGLSL}\n${planetFieldSampleGLSL}\n` + shader.vertexShader;
+      shader.vertexShader = `${oceanVaryings}\n${oceanWavesGLSL}\n${planetFieldSampleGLSL}\n` + shader.vertexShader;
       shader.vertexShader = shader.vertexShader.replace('#include <begin_vertex>', `
         #include <begin_vertex>
         vOceanPoint = position;
@@ -97,9 +79,9 @@ export class Ocean {
         vOceanY = normalMatrix * vec3(0.,1.,0.);
         vOceanZ = normalMatrix * vec3(0.,0.,1.);
         float vertexDepth = planetSeaDepth(planetFieldSample(normalize(position)));
-        transformed += normalize(position) * oceanHeight(position) * smoothstep(0.,.25,vertexDepth);
+        transformed += normalize(position) * oceanSwellHeight(position, normalize(position)) * smoothstep(0.,.25,vertexDepth);
       `);
-      shader.fragmentShader = `${oceanVaryings}\n${waveGLSL}\n${cloudShadowGLSL}\n${planetFieldSampleGLSL}\n${detailVolumeGLSL}\n${shoreGLSL}\n
+      shader.fragmentShader = `${oceanVaryings}\n${oceanWavesGLSL}\n${cloudShadowGLSL}\n${planetFieldSampleGLSL}\n${detailVolumeGLSL}\n${shoreGLSL}\n
         uniform vec3 uDeepWater; uniform vec3 uSeabed; uniform vec3 uSand; uniform vec3 uFoam;
         float oceanDepth, oceanFoam, oceanFootprint, oceanGust, oceanBedK;
       ` + shader.fragmentShader;
@@ -133,8 +115,6 @@ export class Ocean {
         float swell = (1. - smoothstep(0., .1 + phaseWidth, abs(waveU))) * (1. - breaking) * (1. - smoothstep(.05, .14, oceanDepth));
         // The thin crest of a shoaling swell lets light through: a brighter, greener band rolls toward the beach.
         water += swell * vec3(.02, .09, .07);
-        float ripples = pow(.5 + .5 * sin(dot(vOceanPoint, swellA) * 37. + oceanField.b * 5. - uOceanTime * 2.2), 12.);
-        water = mix(water, water * vec3(.82, .92, .96), ripples * DETAIL_FADE(oceanFootprint, .05) * smoothstep(.45, .8, oceanField.a) * smoothstep(.04, .2, oceanDepth) * (.06 + uRain * .08));
         diffuseColor.rgb = water;
         oceanFoam = 0.;
         if (oceanDepth < SHORE_BREAK_DEPTH * 1.4) {
@@ -151,19 +131,21 @@ export class Ocean {
       shader.fragmentShader = shader.fragmentShader.replace('#include <normal_fragment_begin>', `
         #include <normal_fragment_begin>
         vec3 radial = normalize(vOceanPoint);
-        vec3 waveSlope = oceanGradient(vOceanPoint);
-        // Fine capillary ripples break the sun highlight into glints offshore; stronger in gusts, faded out once a
-        // pixel spans their wavelength.
-        float rippleK = DETAIL_FADE(oceanFootprint, .05) * (.55 + .9 * oceanGust);
-        vec3 q = vOceanPoint * 42. + vec3(uOceanTime * .6, 0., -uOceanTime * .5);
-        waveSlope += vec3(sin(dot(q, vec3(.83, .21, .52))), sin(dot(q, vec3(-.31, .78, .55)) + 1.7), sin(dot(q, vec3(.42, -.47, .78)) + 3.1)) * .022 * rippleK;
-        waveSlope -= radial * dot(waveSlope,radial);
-        waveSlope *= smoothstep(0., .22, oceanDepth);
+        // Wind waves (ocean-waves.ts). The swell flattens out over the shallows, where the shore waves take over; the
+        // short chop carries on, rougher in gusts, and calms only in the last few centimetres before the beach.
+        float swellK = smoothstep(0., .22, oceanDepth);
+        float chopK = (.6 + .8 * oceanGust) * mix(.45, 1., swellK) * smoothstep(0., .03, oceanDepth);
+        float unresolvedSlope;
+        vec3 waveSlope = oceanSlope(vOceanPoint, radial, oceanFootprint, vec2(swellK, chopK) * (1. + uRain * .65), unresolvedSlope);
+        waveSlope -= radial * dot(waveSlope, radial);
         normal = normalize(normal - (vOceanX*waveSlope.x+vOceanY*waveSlope.y+vOceanZ*waveSlope.z));
-        // Specular anti-aliasing: slopes a pixel can't resolve widen the highlight instead of sparkling.
+        // Specular anti-aliasing: slopes a pixel can't resolve widen the highlight instead of sparkling. The waves
+        // too short to draw at this distance add their slope variance (GGX alpha^2 = 2 sigma^2), so from afar the sun
+        // spreads into a glitter path.
         vec3 normalSpread = abs(dFdx(normal)) + abs(dFdy(normal));
-        roughnessFactor = sqrt(roughnessFactor * roughnessFactor + dot(normalSpread, normalSpread) * .5 + (1. - rippleK) * .012);
-        roughnessFactor = min(mix(roughnessFactor * mix(.8, 1.3, oceanGust), .6, oceanFoam), 1.);
+        roughnessFactor = sqrt(roughnessFactor * roughnessFactor + dot(normalSpread, normalSpread) * .5);
+        roughnessFactor = sqrt(sqrt(pow(roughnessFactor, 4.) + 2. * unresolvedSlope));
+        roughnessFactor = min(mix(roughnessFactor * mix(.85, 1.2, oceanGust), .6, oceanFoam), 1.);
       `);
       shader.fragmentShader = shader.fragmentShader.replace('#include <lights_fragment_end>', `
         // The sky environment also lights the water column; at the waterline the column is the swash sheet, lit like the
@@ -179,7 +161,7 @@ export class Ocean {
         diffuseColor.a = 1. - (1. - (.02 * oceanFab.x + oceanFab.y)) * (1. - oceanFoam) * oceanBedK;
       `);
     };
-    material.customProgramCacheKey = () => 'planet-ocean-layer-v6';
+    material.customProgramCacheKey = () => 'planet-ocean-layer-v7';
     this.mesh = new THREE.Mesh(geometry, material); this.mesh.name = 'continuous-ocean-sphere';
     this.mesh.castShadow = this.mesh.receiveShadow = false;
     // After the bed and everything else opaque: the blend needs them in the colour buffer already.

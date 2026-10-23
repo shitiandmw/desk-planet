@@ -94,16 +94,19 @@ vec3 apparentSeaPoint(vec3 viewPoint, vec3 viewCentre, float depth) {
  * Stands in for three's lights_fragment_maps in a standard material whose envMap is the sea's sky (ocean.ts). Under
  * the water (`depth` > 0) the sky lights the surface as it lights the sea's own water column. All of it comes in
  * through the surface, from within a cone around `up` (view space): a face gets what it sees of that, so the sides
- * of a rock stay darker than the bed. Scaled by `weight` and fading out with the bed itself (SEABED_FADE), so it meets
- * the unlit deep floor without a seam. Above the water there is no environment light at all. Needs shoreGLSL and
- * `uReflection`, the sea's environment intensity.
+ * of a rock stay darker than the bed. Scaled by `weight`. The bed must stay as brightly lit as the water column
+ * wherever it shows, or it would draw a dark band between the shallows and the open sea; only once the water has all
+ * but hidden it (the end of SEABED_FADE) does the sky light go out, so it meets the unlit deep floor without a seam.
+ * Above the water there is no environment light at all. Needs shoreGLSL and `uReflection`, the sea's environment
+ * intensity.
  */
 export const seaSkyLightGLSL = (depth: string, up: string, weight: string) => `
   #if defined( USE_ENVMAP ) && defined( ENVMAP_TYPE_CUBE_UV )
   if (${depth} > 0.) {
     vec3 seaUp = normalize(${up});
     float facing = clamp(dot(geometryNormal, seaUp) * .5 + .5, 0., 1.);
-    iblIrradiance += getIBLIrradiance(seaUp) * facing * facing * ${weight} * seabedVisible(${depth}) * uReflection;
+    float hidden = smoothstep(SEABED_FADE_END - .12, SEABED_FADE_END, ${depth});
+    iblIrradiance += getIBLIrradiance(seaUp) * facing * facing * ${weight} * (1. - hidden) * uReflection;
   }
   #endif`;
 
@@ -140,14 +143,15 @@ float shoreFoam(vec3 p, float coverage, float footprint) {
 // Caustics on whatever lies under the water, as a factor for its direct sunlight: two drifting slices of the warped
 // cell network, the light gathering on their edges and crossings. Lines are drawn at least a pixel and a half wide
 // (edge distance per pixel ~ footprint / 0.06) and fade once a pixel spans the cells; deeper, they blur and fade.
+// The web roughly keeps the light it gathers: brighter lines, slightly dimmer cells between them.
 float underwaterCaustics(vec3 p, float depth, float footprint) {
-  float k = DETAIL_FADE(footprint, .016) * smoothstep(0., .015, depth) * (1. - smoothstep(.12, .6, depth));
+  float k = DETAIL_FADE(footprint, .016) * smoothstep(0., .015, depth) * (1. - smoothstep(.1, .5, depth));
   if (k < .002) return 1.;
   vec3 q = p * 1.6;
-  float a = textureLod(uDetail, q + vec3(.021, .013, -.017) * uOceanTime, 0.).r;
-  float b = textureLod(uDetail, q * 1.37 + vec3(-.015, .019, .011) * uOceanTime + .5, 0.).r;
-  float line = max(.13 + depth * .25, footprint * 25.);
-  float web = (1. - smoothstep(0., line, a)) + (1. - smoothstep(0., line * 1.3, b)) * .6;
-  return 1. + (web * web * 1.3 - .25) * k;
+  float a = textureLod(uDetail, q + vec3(.045, .028, -.036) * uOceanTime, 0.).r;
+  float b = textureLod(uDetail, q * 1.37 + vec3(-.032, .04, .024) * uOceanTime + .5, 0.).r;
+  float line = max(.11 + depth * .3, footprint * 25.);
+  float web = (1. - smoothstep(0., line, a)) + (1. - smoothstep(0., line * 1.3, b)) * .55;
+  return 1. + (web * web * .85 - .16) * k;
 }
 `;

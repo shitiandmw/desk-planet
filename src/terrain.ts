@@ -181,18 +181,9 @@ export function makeTerrain(parent: THREE.Object3D, renderer: THREE.WebGLRendere
       float sheet = (1. - smoothstep(reach - edge, reach + edge, groundField)) * running;
       vec3 wetSand = shoreWetSand(drySand);
       vec3 sand = mix(mix(drySand, mix(drySand, wetSand, .45), damp), wetSand, wet);
-      // The sea bed: past the waterline the wet sand turns into the paler sand of the shallows. Sea grass grows in
-      // meadows past a band of bare sand along the beach and thins out where the water gets too dark for it: broad
-      // patches with ragged edges (detail volume B at a 2.7-unit tile, roughened by the sand detail), in the meadow's
-      // own colour and blades, darkened and cooled.
-      float seagrass = 0.;
-      if (seaDepth > 0.) {
-        vec4 bedPatch = textureLod(uDetail, vGroundPoint * .37, 0.);
-        float patchEdge = .012 + groundFootprint * .6;
-        seagrass = smoothstep(.6 - patchEdge, .6 + patchEdge, bedPatch.b + (sandDetail.b - .5) * .3) * smoothstep(.1, .2, seaDepth) * (1. - smoothstep(.75, .95, seaDepth));
-        sand = mix(sand, uSeabed * (.92 + .16 * meadow) * (.94 + .12 * sandDetail.b), under);
-        sand = mix(sand, diffuseColor.rgb * vec3(.5, .62, .55), seagrass);
-      }
+      // The sea bed: past the waterline the wet sand turns into the paler sand of the shallows, in soft drifts of
+      // lighter and darker sand. The water above gives it its colour (opaque_fragment, below).
+      if (seaDepth > 0.) sand = mix(sand, uSeabed * (.92 + .16 * meadow) * (.94 + .12 * sandDetail.b), under);
       // The sheet is the sea's water column, a film of water over the wet sand (below the waterline the bed is dimmed
       // by the same film and the sea adds its colour, see ocean.ts).
       sand = mix(sand, mix(uDeepWater, wetSand, exp(-WATER_EXTINCTION * max(reach - groundField, 0.) * 2. * shorePath(vViewPosition, vNormal))), sheet);
@@ -214,16 +205,16 @@ export function makeTerrain(parent: THREE.Object3D, renderer: THREE.WebGLRendere
       // Under water the sea surface does the reflecting; the bed itself is matte.
       roughnessFactor = mix(roughnessFactor, .92, under);`);
     shader.fragmentShader = shader.fragmentShader.replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
-      // Grass blades from the colour texture already sampled (no fetches of their own; bumpMap took three), on the
-      // meadow and in the sea grass, sand grain on the beach; the swash sheet is smooth.
-      float grassBump = grassHeight * .009 * max(1. - beach, seagrass * .7);
+      // Grass blades from the colour texture already sampled (no fetches of their own; bumpMap took three) on the
+      // meadow, sand grain on the beach; the swash sheet is smooth.
+      float grassBump = grassHeight * .009 * (1. - beach);
       normal = groundBump(-vViewPosition, normal, vec2(dFdx(grassBump), dFdy(grassBump)), faceDirection);
       // Wind ripples on the dry sand (~0.035 units apart), fading out before they would alias, and fine grain. Under
       // water the current lays longer ripples (~0.045 units) across the bare sand.
       float ripplePhase = dot(vGroundPoint, vec3(.62, .18, .76)) * 180. + sandDetail.b * 14.;
       float ripples = (pow(.5 + .5 * sin(ripplePhase), 1.6) - .4) * (1. - smoothstep(.8, 2.2, fwidth(ripplePhase))) * (1. - max(wet, damp * .6));
       float bedPhase = dot(vGroundPoint, vec3(-.41, .52, .75)) * 140. + sandDetail.b * 20.;
-      float bedRipples = (pow(.5 + .5 * sin(bedPhase), 1.6) - .4) * (1. - smoothstep(.8, 2.2, fwidth(bedPhase))) * under * (1. - seagrass);
+      float bedRipples = (pow(.5 + .5 * sin(bedPhase), 1.6) - .4) * (1. - smoothstep(.8, 2.2, fwidth(bedPhase))) * under;
       float sandRelief = (ripples * .0011 + bedRipples * .0013 + sandDetail.a * .0006 * grainK) * beach * (1. - sheet);
       normal = reliefBump(-vViewPosition, normal, sandRelief);`);
     shader.fragmentShader = shader.fragmentShader.replace('#include <lights_fragment_maps>', seaSkyLightGLSL('seaDepth', 'vGroundUp', 'under'));
@@ -239,7 +230,7 @@ export function makeTerrain(parent: THREE.Object3D, renderer: THREE.WebGLRendere
       if (seaDepth > 0.) outgoingLight *= seenThroughWater(seaDepth + reach * 2. * (1. - smoothstep(0., .04, seaDepth)), vViewPosition, vGroundUp);
       #include <opaque_fragment>`);
   };
-  groundMaterial.customProgramCacheKey = () => 'planet-ground-shore-v5';
+  groundMaterial.customProgramCacheKey = () => 'planet-ground-shore-v6';
 
   const random = rng(245);
   const dirtMap = canvasTexture(512, (ctx, size) => {

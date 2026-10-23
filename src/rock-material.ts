@@ -25,9 +25,9 @@ export function setRockDetail(detail: THREE.Texture, field: THREE.Texture, sea: 
  * Weathered stone for boulders instanced in planet space. Facets keep their flat shading and the baked vertex
  * shading; per pixel the stone gains broad tone and fine grain from the detail volume (continuous across rocks, so
  * no two match), sun-bleached tops with lichen patches, soil or sand drifted against the base with a contact
- * shadow, and a dark, glossy wet band where waves wash the coastal rocks. Below the sea surface the stone is matte
- * with a tinge of algae, lit by the sky through the water, catches the caustics and is dimmed by the water it is seen
- * through, like the bed (terrain.ts).
+ * shadow, and a dark, glossy wet band where waves wash the coastal rocks. Below the sea surface the stone is dark and
+ * matte, lit by the sky through the water, catches the caustics and is dimmed by the water it is seen through, like
+ * the bed (terrain.ts).
  */
 export const rockMaterial = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: .93, flatShading: true });
 rockMaterial.onBeforeCompile = shader => {
@@ -79,7 +79,8 @@ rockMaterial.onBeforeCompile = shader => {
     // Dark and glossy just above the sea, where the swash washes over the coastal rocks.
     float rockWet = (1. - smoothstep(0., .045, seaHeight + (stone - .5) * .02)) * step(-.2, seaHeight);
     float submerged = 1. - smoothstep(-.02, 0., seaHeight);
-    rock = mix(rock, rock * vec3(.8, .93, .74), submerged * (.4 + .6 * broad.b));
+    // Under water the stone is wet: darker, without the bleached look of the dry tops.
+    rock = mix(rock, rock * vec3(.8, .79, .75), submerged);
     diffuseColor.rgb = rock * (1. - rockWet * .42);`);
   shader.fragmentShader = shader.fragmentShader.replace('#include <roughnessmap_fragment>', `#include <roughnessmap_fragment>
     roughnessFactor = mix(mix(roughnessFactor - top * .05, .38, rockWet), .9, submerged);`);
@@ -92,4 +93,4 @@ rockMaterial.onBeforeCompile = shader => {
     if (seaHeight < 0.) outgoingLight *= seenThroughWater(-seaHeight, vViewPosition, vRockUp);
     #include <opaque_fragment>`);
 };
-rockMaterial.customProgramCacheKey = () => 'weathered-rock-v2';
+rockMaterial.customProgramCacheKey = () => 'weathered-rock-v3';
