@@ -2,30 +2,35 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { PLANET_RADIUS, planetGeometry } from './planet-surface';
 import { HIDDEN_SEABED_DEPTH } from './ocean';
-import { SHORE_BREAK_DEPTH } from './shore';
-import { cullHiddenSeabed } from './terrain';
+import { SEABED_FADE } from './shore';
+import { splitSeabed } from './terrain';
 
-test('the hidden seabed is left out of the ground mesh, and only ever below the opaque sea', () => {
+test('the ground splits by the sea: land to the waterline, the sea bed, and the deep floor the water always hides', () => {
   const geometry = planetGeometry(192, 96), position = geometry.attributes.position;
   const original = Array.from(geometry.index!.array);
   const height = (i: number) => Math.hypot(position.getX(i), position.getY(i), position.getZ(i)) - PLANET_RADIUS;
-  const kept = cullHiddenSeabed(geometry, HIDDEN_SEABED_DEPTH), index = geometry.index!.array;
-  assert.equal(index.length, kept * 3);
-  assert.ok(kept < original.length / 3 * .9, 'a real share of the ground lies under deep water');
+  const { seabed, deep } = splitSeabed(geometry, HIDDEN_SEABED_DEPTH);
+  const parts = { land: geometry.index!.array, seabed: seabed.index!.array, deep: deep.index!.array };
+  assert.equal(parts.land.length + parts.seabed.length + parts.deep.length, original.length);
+  assert.ok(parts.deep.length > original.length * .1, 'a real share of the ground lies under deep water');
+  assert.ok(parts.seabed.length > original.length * .1, 'and a real share is sea bed that shows through the water');
 
-  // The kept triangles are the original ones in their original order: every triangle reaching above the cut stays.
-  let k = 0;
+  // Each part keeps the original triangles in their original order; anything reaching the waterline stays land.
+  const next = { land: 0, seabed: 0, deep: 0 };
   for (let i = 0; i < original.length; i += 3) {
-    const reaches = Math.max(height(original[i]), height(original[i + 1]), height(original[i + 2])) > -HIDDEN_SEABED_DEPTH;
-    if (reaches) {
-      assert.deepEqual([index[k], index[k + 1], index[k + 2]], original.slice(i, i + 3));
-      k += 3;
-    }
+    const triangle = original.slice(i, i + 3), top = Math.max(...triangle.map(height));
+    const part = top >= 0 ? 'land' : top > -HIDDEN_SEABED_DEPTH ? 'seabed' : 'deep';
+    assert.deepEqual(Array.from(parts[part].slice(next[part], next[part] += 3)), triangle);
   }
-  assert.equal(k, index.length);
+  for (const part of ['land', 'seabed', 'deep'] as const) assert.equal(next[part], parts[part].length);
+  // All three draw the same vertices.
+  for (const name of Object.keys(geometry.attributes)) {
+    assert.equal(seabed.attributes[name], geometry.attributes[name]);
+    assert.equal(deep.attributes[name], geometry.attributes[name]);
+  }
 
-  // Dropped ground sits deeper than the lowest wave trough (the swell sums to 0.0133, 65% more in rain), and below the
-  // surf zone the water shades on its own.
-  assert.ok(HIDDEN_SEABED_DEPTH > .0133 * 1.65 && HIDDEN_SEABED_DEPTH >= SHORE_BREAK_DEPTH);
-  geometry.dispose();
+  // The deep floor sits deeper than the depth where the water has hidden the bed completely, with a margin for the
+  // mesh's flat triangles against the per-pixel depth, and below the lowest wave trough (0.0133, 65% more in rain).
+  assert.ok(HIDDEN_SEABED_DEPTH >= SEABED_FADE[1] + .05 && HIDDEN_SEABED_DEPTH > .0133 * 1.65);
+  geometry.dispose(); seabed.dispose(); deep.dispose();
 });

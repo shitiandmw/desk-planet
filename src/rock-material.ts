@@ -2,6 +2,8 @@ import * as THREE from 'three';
 import { detailVolumeGLSL } from './detail-volume';
 import { planetFieldSampleGLSL } from './planet-field-texture';
 import { PLANET_RADIUS } from './planet-surface';
+import type { Ocean } from './ocean';
+import { apparentSeaPointGLSL, seaSkyLightGLSL, shoreGLSL } from './shore';
 
 const rockUniforms = {
   uDetail: { value: null as THREE.Texture | null },
@@ -9,22 +11,28 @@ const rockUniforms = {
   uRockSand: { value: new THREE.Color('#d6c597') },
   uRockSoil: { value: new THREE.Color('#7b6c4c') },
   uLichen: { value: new THREE.Color('#d8d6c2') },
+  uOceanTime: { value: 0 },
+  uReflection: { value: 1 },
 };
-/** Binds the shared detail volume and the baked land field; called once both are baked. */
-export function setRockDetail(detail: THREE.Texture, field: THREE.Texture) {
+/** Binds the shared detail volume, the baked land field and the sea (its clock and sky); called once both textures are baked. */
+export function setRockDetail(detail: THREE.Texture, field: THREE.Texture, sea: Ocean) {
   rockUniforms.uDetail.value = detail; rockUniforms.uPlanetField.value = field;
+  rockUniforms.uOceanTime = sea.uniforms.uOceanTime; rockUniforms.uReflection = sea.uniforms.uReflection;
+  rockMaterial.envMap = sea.environment;
 }
 
 /**
  * Weathered stone for boulders instanced in planet space. Facets keep their flat shading and the baked vertex
  * shading; per pixel the stone gains broad tone and fine grain from the detail volume (continuous across rocks, so
  * no two match), sun-bleached tops with lichen patches, soil or sand drifted against the base with a contact
- * shadow, and a dark, glossy wet band where waves wash the coastal rocks.
+ * shadow, and a dark, glossy wet band where waves wash the coastal rocks. Below the sea surface the stone is matte
+ * with a tinge of algae, lit by the sky through the water, catches the caustics and is dimmed by the water it is seen
+ * through, like the bed (terrain.ts).
  */
 export const rockMaterial = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: .93, flatShading: true });
 rockMaterial.onBeforeCompile = shader => {
   Object.assign(shader.uniforms, rockUniforms);
-  shader.vertexShader = 'varying vec3 vRockPoint;\nvarying vec3 vRockLocal;\nvarying vec3 vRockUp;\n' + shader.vertexShader;
+  shader.vertexShader = `varying vec3 vRockPoint;\nvarying vec3 vRockLocal;\nvarying vec3 vRockUp;\n${apparentSeaPointGLSL}` + shader.vertexShader;
   shader.vertexShader = shader.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>
     vRockLocal = transformed;
     #ifdef USE_INSTANCING
@@ -34,11 +42,15 @@ rockMaterial.onBeforeCompile = shader => {
     #endif
     // The instanced meshes sit at the planet's origin: the radial direction in view space is "up" for the rock.
     vRockUp = normalMatrix * vRockPoint;`);
+  // Submerged faces are drawn where they are seen through the water (shore.ts).
+  shader.vertexShader = shader.vertexShader.replace('#include <project_vertex>', `#include <project_vertex>
+    float rockSeaDepth = ${PLANET_RADIUS.toFixed(4)} - length(vRockPoint);
+    if (rockSeaDepth > 0.) { mvPosition.xyz = apparentSeaPoint(mvPosition.xyz, modelViewMatrix[3].xyz, rockSeaDepth); gl_Position = projectionMatrix * mvPosition; }`);
   shader.fragmentShader = `varying vec3 vRockPoint;
     varying vec3 vRockLocal;
     varying vec3 vRockUp;
-    uniform vec3 uRockSand; uniform vec3 uRockSoil; uniform vec3 uLichen;
-    ${planetFieldSampleGLSL}${detailVolumeGLSL}
+    uniform vec3 uRockSand; uniform vec3 uRockSoil; uniform vec3 uLichen; uniform float uOceanTime; uniform float uReflection;
+    ${planetFieldSampleGLSL}${detailVolumeGLSL}${shoreGLSL}
     // Surface-gradient bump with heights in planet units (Mikkelsen), for relief that keeps its scale at any zoom.
     vec3 rockBump(vec3 p, vec3 n, float height) {
       vec3 dpx = dFdx(p), dpy = dFdy(p), r1 = cross(dpy, n), r2 = cross(n, dpx);
@@ -66,10 +78,18 @@ rockMaterial.onBeforeCompile = shader => {
     rock = mix(rock, mix(uRockSoil, uRockSand, onSand) * .7, base * .5) * (1. - base * .18);
     // Dark and glossy just above the sea, where the swash washes over the coastal rocks.
     float rockWet = (1. - smoothstep(0., .045, seaHeight + (stone - .5) * .02)) * step(-.2, seaHeight);
+    float submerged = 1. - smoothstep(-.02, 0., seaHeight);
+    rock = mix(rock, rock * vec3(.8, .93, .74), submerged * (.4 + .6 * broad.b));
     diffuseColor.rgb = rock * (1. - rockWet * .42);`);
   shader.fragmentShader = shader.fragmentShader.replace('#include <roughnessmap_fragment>', `#include <roughnessmap_fragment>
-    roughnessFactor = mix(roughnessFactor - top * .05, .38, rockWet);`);
+    roughnessFactor = mix(mix(roughnessFactor - top * .05, .38, rockWet), .9, submerged);`);
   shader.fragmentShader = shader.fragmentShader.replace('#include <normal_fragment_begin>', `#include <normal_fragment_begin>
     normal = rockBump(-vViewPosition, normal, (stone * .01 + fine.a * .0012 * fineK) * (1. - rockWet * .5));`);
+  shader.fragmentShader = shader.fragmentShader.replace('#include <lights_fragment_maps>', seaSkyLightGLSL('-seaHeight', 'vRockUp', 'submerged'));
+  shader.fragmentShader = shader.fragmentShader.replace('#include <lights_fragment_end>', `#include <lights_fragment_end>
+    if (seaHeight < 0.) reflectedLight.directDiffuse *= underwaterCaustics(vRockPoint, -seaHeight, rockFootprint);`);
+  shader.fragmentShader = shader.fragmentShader.replace('#include <opaque_fragment>', `
+    if (seaHeight < 0.) outgoingLight *= seenThroughWater(-seaHeight, vViewPosition, vRockUp);
+    #include <opaque_fragment>`);
 };
-rockMaterial.customProgramCacheKey = () => 'weathered-rock-v1';
+rockMaterial.customProgramCacheKey = () => 'weathered-rock-v2';

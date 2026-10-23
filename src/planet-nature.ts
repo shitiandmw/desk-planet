@@ -44,7 +44,7 @@ export function makePlanetNature(parent: THREE.Object3D, scenery: SceneryClearan
 
   // Weathered boulders on the coasts and mountain flanks: three shapes, mossy tops, sunk into the slope.
   const shapes = [boulderGeometry(901, 2, .9), boulderGeometry(917, 2, .55), boulderGeometry(933, 2, 1)];
-  const rocks = shapes.map(g => new THREE.InstancedMesh(g, rockMaterial, 60)), counts = [0, 0, 0];
+  const rocks = shapes.map(g => new THREE.InstancedMesh(g, rockMaterial, 72)), counts = [0, 0, 0];
   const stone = ['#b5af9f', '#a9ab9f', '#bdb5a2', '#a3a598'].map(c => new THREE.Color(c));
   for (let i = 0, count = 0; i < 1600 && count < 150; i++) {
     const index = (i * 557) % 1600;
@@ -61,6 +61,27 @@ export function makePlanetNature(parent: THREE.Object3D, scenery: SceneryClearan
     dummy.updateMatrix();
     const k = count++ % 3; rocks[k].setMatrixAt(counts[k], dummy.matrix);
     rocks[k].setColorAt(counts[k]++, stone[Math.floor(random() * stone.length)].clone().multiplyScalar(.9 + random() * .14));
+  }
+  // Rocks in the shallows, in twos and threes: some break the surface, some lie just under it. Through the clear water
+  // their sides, the caustics on them and their shadows on the bed show how deep it is. The tops weather to algae.
+  const shallows: THREE.Vector3[] = [];
+  for (let i = 0; i < 9000 && shallows.length < 13; i++) {
+    const index = (i * 2113) % 9000, y = 1 - 2 * (index + .5) / 9000, a = index * 2.399963;
+    const n = vec(Math.cos(a) * Math.sqrt(1 - y * y), y, Math.sin(a) * Math.sqrt(1 - y * y)), depth = -elevation(n);
+    if (depth < .04 || depth > .22 || random() > .35 || shallows.some(p => p.distanceTo(n) * PLANET_RADIUS < 1.2)) continue;
+    shallows.push(n);
+    const east = vec(0, 1, 0).cross(n).normalize(), north = n.clone().cross(east);
+    for (let j = 0, members = 2 + Math.floor(random() * 2); j < members; j++) {
+      const spread = j ? .14 + random() * .18 : 0, turn = random() * Math.PI * 2;
+      const m = n.clone().addScaledVector(east, Math.cos(turn) * spread / PLANET_RADIUS).addScaledVector(north, Math.sin(turn) * spread / PLANET_RADIUS).normalize();
+      const bed = Math.min(0, elevation(m)), size = j ? .05 + random() * .08 : .1 + random() * .12;
+      dummy.position.copy(m).multiplyScalar(PLANET_RADIUS + bed + size * .28);
+      dummy.quaternion.setFromUnitVectors(NORTH, m); dummy.rotateY(random() * 7);
+      dummy.scale.set(size * (1 + random() * .4), size * (.75 + random() * .35), size);
+      dummy.updateMatrix();
+      const k = (shallows.length + j) % 3; rocks[k].setMatrixAt(counts[k], dummy.matrix);
+      rocks[k].setColorAt(counts[k]++, stone[Math.floor(random() * stone.length)].clone().multiplyScalar(.82 + random() * .12));
+    }
   }
   rocks.forEach((m, k) => { m.count = counts[k]; m.castShadow = m.receiveShadow = true; m.name = 'boulders'; parent.add(m); scenery.register(m); });
 

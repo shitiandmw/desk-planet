@@ -341,7 +341,7 @@ export class WoodlandScene {
   private clearAzimuth(target: THREE.Object3D, n: THREE.Vector3, facing: THREE.Quaternion, lift: number, distance: number, elevation: number) {
     this.world.updateMatrixWorld(true);
     const people = new Set([...this.settlement.actors.values()].map(a => a.root as THREE.Object3D));
-    const blockers = this.world.children.filter(o => o.visible && o !== target && o !== this.surface.terrain && o !== this.surface.ocean && !people.has(o));
+    const blockers = this.world.children.filter(o => o.visible && o !== target && o !== this.surface.terrain && o !== this.surface.seabed && o !== this.surface.deepFloor && o !== this.surface.ocean && !people.has(o));
     const origin = onSurface(n).addScaledVector(n, lift), from = this.world.localToWorld(origin.clone());
     let best = .62, clearest = -1;
     for (const azimuth of [.62, -.62, 1.2, -1.2, 0, 2.2, -2.2, Math.PI]) {
@@ -545,14 +545,15 @@ export class WoodlandScene {
   private syncSettlement() { return this.settlement.sync(this.reducedMotion ? 0 : this.phase); }
   /**
    * three's SSAO prepass only hides points and lines. Transparent shells (atmosphere rim, clouds, smoke, build
-   * ghosts) would otherwise be drawn opaque into its depth buffer and wash the occlusion out beneath them.
+   * ghosts) would otherwise be drawn opaque into its depth buffer and wash the occlusion out beneath them. The sea bed
+   * is left out too (userData.skipAO): the sea surface covers it there anyway.
    */
   private hideTransparentFromAO() {
     const ao = this.ao as unknown as { _visibilityCache: THREE.Object3D[]; _overrideVisibility: () => void };
     ao._overrideVisibility = () => this.scene.traverseVisible(o => {
       const material = (o as THREE.Mesh).material as THREE.Material | THREE.Material[] | undefined;
       const transparent = Array.isArray(material) ? material.some(m => m.transparent) : !!material?.transparent;
-      if ((o as THREE.Points).isPoints || (o as THREE.Line).isLine || transparent) { o.visible = false; ao._visibilityCache.push(o); }
+      if ((o as THREE.Points).isPoints || (o as THREE.Line).isLine || transparent || o.userData.skipAO) { o.visible = false; ao._visibilityCache.push(o); }
     });
   }
 

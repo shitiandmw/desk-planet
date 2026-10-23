@@ -4,7 +4,7 @@ import { cloudShadowGLSL, type CloudShadowUniform } from './cloud-shadows';
 import { PLANET_RADIUS } from './planet-surface';
 import { planetFieldSampleGLSL } from './planet-field-texture';
 import { detailVolumeGLSL } from './detail-volume';
-import { SHORE_BREAK_DEPTH, shoreGLSL } from './shore';
+import { SEABED_FADE, SEABED_RAY_REACH, shoreGLSL } from './shore';
 
 const waveGLSL = `
 uniform float uOceanTime;
@@ -33,11 +33,13 @@ varying vec3 vOceanZ;
 `;
 
 /**
- * A closed dielectric water shell. Depth comes from the baked terrain field per pixel, so the shoreline, the sandy
- * shallows, caustics and the surf are smooth at any zoom instead of following mesh triangles. The colour is a water
- * column rather than painted bands: light that reaches the sea bed and returns is absorbed per channel along the
- * refracted view path, so the shallows over pale sand turn turquoise, deepen to blue and stay clear when seen from
- * above. Caustics and foam come from the shared detail volume and are only evaluated in the band where they show.
+ * A closed dielectric water shell laid over the sea bed. The bed is drawn first (terrain.ts, rock-material.ts) with
+ * its own sand, sea grass, shadows and caustics, and dims itself by the water it is seen through, per channel along
+ * the refracted view path: the shallows over pale sand turn turquoise and deepen to blue, and whatever lies down there
+ * stays visible. This shell is blended over it (premultiplied): it adds the light the water column scatters back, the
+ * sky reflection and the foam, and covers the bed where the sea is too deep to see it (or paints a plain one where a
+ * grazing view ray can't reach the drawn bed). Depth comes from the baked terrain field per pixel, so the shallows and
+ * the surf are smooth at any zoom instead of following mesh triangles.
  */
 export class Ocean {
   reflectionStrength = 1;
@@ -81,6 +83,9 @@ export class Ocean {
     const material = new THREE.MeshPhysicalMaterial({
       color: '#ffffff', metalness: 0, roughness: .12, ior: 1.333,
       envMap: this.reflection.texture, envMapIntensity: 1.0,
+      // A premultiplied layer over the bed. It stays in the opaque list (and the AO prepass); renderOrder draws it after
+      // everything opaque and before the transparent shells.
+      blending: THREE.CustomBlending, blendSrc: THREE.OneFactor, blendDst: THREE.OneMinusSrcAlphaFactor,
     });
     material.onBeforeCompile = shader => {
       Object.assign(shader.uniforms, this.uniforms, { uCloudShadows: cloudShadows, uCloudShadowRadii: cloudShadows.radii });
@@ -96,7 +101,7 @@ export class Ocean {
       `);
       shader.fragmentShader = `${oceanVaryings}\n${waveGLSL}\n${cloudShadowGLSL}\n${planetFieldSampleGLSL}\n${detailVolumeGLSL}\n${shoreGLSL}\n
         uniform vec3 uDeepWater; uniform vec3 uSeabed; uniform vec3 uSand; uniform vec3 uFoam;
-        float oceanDepth, oceanFoam, oceanFootprint, oceanGust;
+        float oceanDepth, oceanFoam, oceanFootprint, oceanGust, oceanBedK;
       ` + shader.fragmentShader;
       shader.fragmentShader = shader.fragmentShader.replace('#include <color_fragment>', `
         #include <color_fragment>
@@ -105,34 +110,29 @@ export class Ocean {
         oceanFootprint = length(fwidth(vOceanPoint));
         // Gusts: broad patches of rougher water drift across the sea; they carry more ripples and reflect less sky.
         oceanGust = texture(uDetail, vOceanPoint * .045 + vec3(.0021, 0., .0013) * uOceanTime).b;
-        // The water column: light reaches the bed and returns along the refracted view ray, losing red first.
-        // At the waterline the column also holds the swash sheet running up the beach, exactly as the beach shades it,
-        // so the water and the sand agree where the two meshes meet.
+        // The water column: the bed beneath already lost its share of light on the way down and back up; the column
+        // scatters back the rest, and past SEABED_FADE it hides the bed entirely. At the waterline the column also holds
+        // the swash sheet running up the beach, exactly as the beach shades it, so the water and the sand agree where
+        // the two meshes meet.
         float landPhase = shorePhase(0., oceanField.b);
         float surge = SHORE_SWASH_MAX * shoreSet(floor(landPhase)) * swashProfile(fract(landPhase)) * (1. - smoothstep(0., .04, oceanDepth));
-        vec3 transmit = exp(-WATER_EXTINCTION * (oceanDepth + surge * 2.) * shorePath(vViewPosition, vNormal));
-        vec3 bed = mix(shoreWetSand(uSand * (.95 + .1 * oceanField.b)), uSeabed * (.92 + .16 * oceanField.b), smoothstep(0., .05, oceanDepth));
+        // The bed is drawn where it is seen (apparentSeaPointGLSL), at least a little under the surface: a view ray
+        // grazing the planet's rim that leaves the water again before reaching it has no bed behind it (SEABED_RAY_REACH).
+        // There the column carries a plain sand bed of its own, so the shallows stay turquoise out to the rim.
+        vec3 planetCentre = viewMatrix[3].xyz, viewRay = normalize(-vViewPosition);
+        float rayReach = ${PLANET_RADIUS.toFixed(4)} - length(planetCentre - dot(planetCentre, viewRay) * viewRay);
+        float bedSeen = seabedVisible(oceanDepth), bedDrawn = smoothstep(${SEABED_RAY_REACH.map(n => n.toFixed(3)).join(', ')}, rayReach);
+        oceanBedK = bedSeen * bedDrawn;
+        vec3 through = seenThroughWater(oceanDepth + surge * 2., vViewPosition, vNormal) * bedSeen;
+        vec3 plainBed = mix(shoreWetSand(uSand * (.95 + .1 * oceanField.b)), uSeabed * (.92 + .16 * oceanField.b), smoothstep(0., .06, oceanDepth));
+        vec3 water = uDeepWater * (1. - through) + plainBed * through * (1. - bedDrawn);
         // Shore waves (shore.ts): swells shoal and steepen, break into a bore of white water and run up the sand.
         float wavePhase = shorePhase(oceanDepth, oceanField.b), phaseWidth = fwidth(wavePhase);
         float waveU = fract(wavePhase + .5) - .5;
         float breaking = smoothstep(SHORE_BREAK_DEPTH * 1.2, SHORE_BREAK_DEPTH * .75, oceanDepth) * shoreSet(floor(wavePhase));
         float swell = (1. - smoothstep(0., .1 + phaseWidth, abs(waveU))) * (1. - breaking) * (1. - smoothstep(.05, .14, oceanDepth));
-        if (oceanDepth < .45) {
-          // Caustics: two drifting slices of the warped cell network; light gathers on their edges and crossings.
-          // Lines are drawn at least a pixel and a half wide (edge distance per pixel ~ footprint / 0.06), then fade.
-          float causticK = DETAIL_FADE(oceanFootprint, .016) * smoothstep(.0, .02, oceanDepth) * (1. - smoothstep(.05, .45, oceanDepth));
-          if (causticK > .002) {
-            vec3 q = vOceanPoint * 1.6;
-            float a = textureLod(uDetail, q + vec3(.021, .013, -.017) * uOceanTime, 0.).r;
-            float b = textureLod(uDetail, q * 1.37 + vec3(-.015, .019, .011) * uOceanTime + .5, 0.).r;
-            float line = max(.13, oceanFootprint * 25.);
-            float web = (1. - smoothstep(0., line, a)) + (1. - smoothstep(0., line * 1.3, b)) * .6;
-            bed *= 1. + (web * web * .32 - .08) * causticK;
-          }
-        }
-        vec3 water = mix(uDeepWater, bed, transmit);
         // The thin crest of a shoaling swell lets light through: a brighter, greener band rolls toward the beach.
-        water *= 1. + swell * vec3(.05, .16, .13);
+        water += swell * vec3(.02, .09, .07);
         float ripples = pow(.5 + .5 * sin(dot(vOceanPoint, swellA) * 37. + oceanField.b * 5. - uOceanTime * 2.2), 12.);
         water = mix(water, water * vec3(.82, .92, .96), ripples * DETAIL_FADE(oceanFootprint, .05) * smoothstep(.45, .8, oceanField.a) * smoothstep(.04, .2, oceanDepth) * (.06 + uRain * .08));
         diffuseColor.rgb = water;
@@ -166,7 +166,7 @@ export class Ocean {
         roughnessFactor = min(mix(roughnessFactor * mix(.8, 1.3, oceanGust), .6, oceanFoam), 1.);
       `);
       shader.fragmentShader = shader.fragmentShader.replace('#include <lights_fragment_end>', `
-        // The sky environment also lights the water column; the bed seen through the last of the water is lit like the
+        // The sky environment also lights the water column; at the waterline the column is the swash sheet, lit like the
         // beach beside it instead, so the water fades into the wet sand rather than outlining the mesh intersection.
         iblIrradiance *= smoothstep(0., .03, oceanDepth);
         #include <lights_fragment_end>
@@ -174,11 +174,16 @@ export class Ocean {
         reflectedLight.directDiffuse *= cloudShadow;
         reflectedLight.directSpecular *= cloudShadow * (1. - oceanFoam);
         reflectedLight.indirectSpecular *= 1. - oceanFoam * .7;
+        // Blended over the bed: it shows through all but the reflected share (water F0 = 0.02), the foam and the depth.
+        vec2 oceanFab = DFGApprox(normal, geometryViewDir, material.roughness);
+        diffuseColor.a = 1. - (1. - (.02 * oceanFab.x + oceanFab.y)) * (1. - oceanFoam) * oceanBedK;
       `);
     };
-    material.customProgramCacheKey = () => 'planet-ocean-column-v5';
+    material.customProgramCacheKey = () => 'planet-ocean-layer-v6';
     this.mesh = new THREE.Mesh(geometry, material); this.mesh.name = 'continuous-ocean-sphere';
     this.mesh.castShadow = this.mesh.receiveShadow = false;
+    // After the bed and everything else opaque: the blend needs them in the colour buffer already.
+    this.mesh.renderOrder = 1;
   }
 
   update(time: number, rain: number, cloudiness: number) {
@@ -190,5 +195,8 @@ export class Ocean {
   dispose() { this.reflection.dispose(); this.mesh.geometry.dispose(); this.mesh.material.dispose(); }
 }
 
-/** Sea depth beyond which the beach terrain is always under opaque water, so the ground mesh can leave it out. */
-export const HIDDEN_SEABED_DEPTH = SHORE_BREAK_DEPTH * 1.25;
+/**
+ * Sea depth past which the bed never shows through the water (SEABED_FADE), so the ground mesh can leave it out. The
+ * margin covers the mesh's flat triangles against the per-pixel depth; a plain shell closes the planet below (terrain.ts).
+ */
+export const HIDDEN_SEABED_DEPTH = SEABED_FADE[1] + .1;
